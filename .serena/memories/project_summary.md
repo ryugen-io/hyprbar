@@ -6,8 +6,21 @@
 -   **Language**: Rust (2024 edition)
 -   **Core**: `ks-core` (rendering logic, state, `ratatui`)
 -   **Wayland**: `ks-wayland` (SCTK 0.19, `wayland-client`, layer shell)
--   **Binary**: `ks-bin` (entry point, tokio runtime, integration)
--   **Dependencies**: `kitchn_lib` (config/theme), `tachyonfx` (effects)
+-   **Binary**: `ks-bin` (entry point, tokio runtime,## Configuration Pattern
+
+`kitchnsink` follows the **Dumb Receiver** pattern:
+1.  **Layout & Style**: Reads `~/.config/kitchnsink/sink.toml`.
+    -   This file contains all resolved colors (BG/FG) and layout settings.
+    -   It is expected to be generated/updated by the `kitchn` tool's "cook" process.
+2.  **Logging**: Uses `kitchn_lib` only for logging context.
+
+```rust
+// CORRECT: Read from SinkConfig
+let bg_hex = &state.config.style.bg;
+
+// INCORRECT: Do NOT read from Cookbook
+// let bg_hex = state.cookbook.theme.colors.get("bg");
+```
 
 **Structure**:
 -   Workspace with 3 crates: `ks-core`, `ks-wayland`, `ks-bin`.

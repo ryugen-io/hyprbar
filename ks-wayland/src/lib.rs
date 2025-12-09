@@ -14,7 +14,10 @@ use smithay_client_toolkit::{
 };
 use state::WaylandState;
 
-pub fn init() -> Result<(WaylandState, EventQueue<WaylandState>, LayerSurface)> {
+pub fn init(
+    height: u32,
+    anchor_bottom: bool,
+) -> Result<(WaylandState, EventQueue<WaylandState>, LayerSurface)> {
     let conn = Connection::connect_to_env().context("Failed to connect to Wayland")?;
 
     // In SCTK 0.17+, RegistryState::new returns the state. EventQueue is created separately.
@@ -63,9 +66,14 @@ pub fn init() -> Result<(WaylandState, EventQueue<WaylandState>, LayerSurface)> 
     );
 
     // Initial configuration
-    layer_surface.set_anchor(Anchor::TOP | Anchor::LEFT | Anchor::RIGHT);
-    layer_surface.set_size(0, 30); // Default height 30, width max
-    layer_surface.set_exclusive_zone(30);
+    let anchor = if anchor_bottom {
+        Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT
+    } else {
+        Anchor::TOP | Anchor::LEFT | Anchor::RIGHT
+    };
+    layer_surface.set_anchor(anchor);
+    layer_surface.set_size(0, height);
+    layer_surface.set_exclusive_zone(height as i32);
     surface.commit(); // Changed from layer_surface.commit()
 
     // Store WlSurface in state for reference if needed

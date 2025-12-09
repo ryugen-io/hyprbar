@@ -12,3 +12,5 @@ log = { workspace = true }
 tokio = { workspace = true }
 smithay-client-toolkit = { workspace = true }
 wayland-client = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }

@@ -51,21 +51,10 @@ impl BarRenderer {
         self.buffer.reset();
 
         // Build widgets based on state
-        // For now, a simple test widget
-        let bg_color_hex = state
-            .cookbook
-            .theme
-            .colors
-            .get("bg")
-            .map(|s| s.as_str())
-            .unwrap_or("#000000");
-        let fg_color_hex = state
-            .cookbook
-            .theme
-            .colors
-            .get("fg")
-            .map(|s| s.as_str())
-            .unwrap_or("#ffffff");
+        // Build widgets based on state
+        // Decoupled from Cookbook (use Config)
+        let bg_color_hex = &state.config.style.bg;
+        let fg_color_hex = &state.config.style.fg;
 
         let bg_custom = ColorResolver::hex_to_color(bg_color_hex);
         let fg_custom = ColorResolver::hex_to_color(fg_color_hex);
