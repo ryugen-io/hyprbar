@@ -1,0 +1,12 @@
+[package]
+name = "ks-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = { workspace = true }
+tachyonfx = { workspace = true }
+kitchn_lib = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+thiserror = "2.0"

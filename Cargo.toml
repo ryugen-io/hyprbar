@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = [
+    "ks-core",
+    "ks-wayland",
+    "ks-bin"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["kitchnsink contributors"]
+
+[workspace.dependencies]
+ratatui = "0.29.0"
+tachyonfx = { version = "0.10.1", features = ["std-duration"] }
+anyhow = "1.0"
+log = "0.4"
+tokio = { version = "1.42", features = ["full"] }
+smithay-client-toolkit = "0.19"
+wayland-client = "0.31"
+kitchn_lib = { path = "../kitchn/crates/kitchn_lib" }
+ks-core = { path = "./ks-core" }
+ks-wayland = { path = "./ks-wayland" }
