@@ -90,9 +90,14 @@ SINK_CONFIG='# KitchnSink Configuration
 [window]
 height = 24
 anchor = "bottom"
+# Monitor to display on: "primary" or output name (e.g. "HDMI-A-1")
 monitor = "primary"
 
 [layout]
+# Logical partitioning (percentages, default 33/33/33)
+left = 33
+center = 33
+right = 33
 modules_left = ["workspaces"]
 modules_center = ["clock"]
 modules_right = ["systray", "cpu", "memory"]
@@ -100,6 +105,8 @@ modules_right = ["systray", "cpu", "memory"]
 [theme]
 # Uses kitchn styles by default, override here if needed
 opacity = 0.95
+# Path to custom font (optional). If not set, tries default system fonts.
+# font = "/usr/share/fonts/TTF/DejaVuSansMono.ttf"
 '
 
 # -----------------------------------------------------------------------------

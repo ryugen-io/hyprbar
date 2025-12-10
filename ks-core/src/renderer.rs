@@ -67,10 +67,37 @@ impl BarRenderer {
             state.cpu, state.mem, state.time
         );
 
+        // Logical Layout
+        let layout_constraints = [
+            Constraint::Percentage(state.config.layout.left as u16),
+            Constraint::Percentage(state.config.layout.center as u16),
+            Constraint::Percentage(state.config.layout.right as u16),
+        ];
+
+        let _chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(layout_constraints)
+            .split(area);
+
+        // For now, render the bar text into the center chunk, or full area?
+        // Prompt asks for "logical background" setup.
+        // We'll keep the full bar render for visual stability, but log the chunks or prepare them.
+        // Let's render the text centered in the whole bar for now to avoid breaking existing visual.
+        // The chunks are available for "Task 2".
+
+        /*
+        // Example usage for later:
+        let left_chunk = chunks[0];
+        let center_chunk = chunks[1];
+        let right_chunk = chunks[2];
+        */
+
+        // Create the paragraph as before
         let bar = Paragraph::new(text)
             .style(Style::default().fg(fg).bg(bg))
             .alignment(Alignment::Center);
 
+        // Render to the full area for now to maintain current look
         bar.render(area, &mut self.buffer);
 
         // Apply effects

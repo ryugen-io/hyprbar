@@ -316,9 +316,13 @@ async fn main() -> Result<()> {
     let mut renderer = BarRenderer::new(100, config.window.height as u16);
 
     // 6. Initialize Wayland
-    let (mut wayland_state, mut event_queue, _layer_surface) =
-        init_wayland(config.window.height, config.window.anchor == "bottom")
-            .context("Failed to initialize Wayland")?;
+    let (mut wayland_state, mut event_queue, _layer_surface) = init_wayland(
+        config.window.height,
+        config.window.anchor == "bottom",
+        Some(config.window.monitor.clone()),
+        config.style.font.clone(),
+    )
+    .context("Failed to initialize Wayland")?;
     let qh = event_queue.handle();
 
     // 7. Event Loop
@@ -335,9 +339,21 @@ async fn main() -> Result<()> {
             let width = u16::try_from(wayland_state.width).unwrap_or(u16::MAX);
             let height = u16::try_from(wayland_state.height).unwrap_or(u16::MAX);
 
-            if width > 0 && height > 0 && (renderer.width != width || renderer.height != height) {
-                renderer.resize(width, height);
-                debug!("Resized to {}x{}", width, height);
+            if width > 0 && height > 0 {
+                // Calculate grid size based on font metrics
+                let char_w = wayland_state.text_renderer.char_width as u16;
+                let char_h = wayland_state.text_renderer.char_height as u16;
+
+                let cols = width / char_w;
+                let rows = height / char_h;
+
+                if renderer.width != cols || renderer.height != rows {
+                    renderer.resize(cols, rows);
+                    debug!(
+                        "Resized to {}x{} cells (Window: {}x{})",
+                        cols, rows, width, height
+                    );
+                }
             }
 
             if wayland_state.redraw_requested {
@@ -345,7 +361,13 @@ async fn main() -> Result<()> {
                 bar_state.mem = 45.2;
 
                 renderer.render_frame(&bar_state, Duration::from_millis(16))?;
-                wayland_state.draw(&qh, renderer.buffer(), &bar_state.cookbook)?;
+                renderer.render_frame(&bar_state, Duration::from_millis(16))?;
+                wayland_state.draw(
+                    &qh,
+                    renderer.buffer(),
+                    &bar_state.cookbook,
+                    &config.style.bg,
+                )?;
                 // trace!("Frame rendered"); // Too noisy
             }
         }

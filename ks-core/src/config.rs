@@ -6,12 +6,40 @@ pub struct SinkConfig {
     pub window: WindowConfig,
     #[serde(default)]
     pub style: StyleConfig,
+    #[serde(default)]
+    pub layout: LayoutConfig,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LayoutConfig {
+    #[serde(default = "default_layout_percent")]
+    pub left: u8,
+    #[serde(default = "default_layout_percent")]
+    pub center: u8,
+    #[serde(default = "default_layout_percent")]
+    pub right: u8,
+}
+
+impl Default for LayoutConfig {
+    fn default() -> Self {
+        Self {
+            left: 33,
+            center: 33,
+            right: 33,
+        }
+    }
+}
+
+fn default_layout_percent() -> u8 {
+    33
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WindowConfig {
     pub height: u32,
     pub anchor: String, // "top", "bottom"
+    #[serde(default = "default_monitor")]
+    pub monitor: String,
 }
 
 impl Default for WindowConfig {
@@ -19,8 +47,13 @@ impl Default for WindowConfig {
         Self {
             height: 30,
             anchor: "top".to_string(),
+            monitor: "primary".to_string(),
         }
     }
+}
+
+fn default_monitor() -> String {
+    "primary".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

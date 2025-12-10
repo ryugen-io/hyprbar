@@ -13,6 +13,8 @@ use smithay_client_toolkit::{
     shm::{Shm, slot::SlotPool},
 };
 
+use crate::text::TextRenderer;
+
 pub struct WaylandState {
     pub registry_state: RegistryState,
     pub seat_state: SeatState,
@@ -30,6 +32,8 @@ pub struct WaylandState {
     pub configured: bool,
     pub width: u32,
     pub height: u32,
+
+    pub text_renderer: TextRenderer,
 }
 
 impl WaylandState {
@@ -42,6 +46,7 @@ impl WaylandState {
         _qh: &QueueHandle<Self>,
         buffer: &Buffer,
         cookbook: &Cookbook,
+        bg_color_hex: &str,
     ) -> anyhow::Result<()> {
         let width = self.width;
         let height = self.height;
@@ -64,7 +69,16 @@ impl WaylandState {
             .context("Failed to create buffer")?;
 
         // Blit
-        blit_buffer_to_pixels(buffer, canvas, width, height, cookbook);
+        // Blit
+        blit_buffer_to_pixels(
+            buffer,
+            canvas,
+            width,
+            height,
+            cookbook,
+            &self.text_renderer,
+            bg_color_hex,
+        );
 
         // Attach and damage
         if let Some(surface) = &self.surface {

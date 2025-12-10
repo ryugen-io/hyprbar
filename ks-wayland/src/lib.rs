@@ -1,6 +1,7 @@
 pub mod blitter;
 pub mod handlers;
 pub mod state;
+pub mod text;
 
 use anyhow::{Context, Result};
 use smithay_client_toolkit::{
@@ -13,10 +14,13 @@ use smithay_client_toolkit::{
     shm::{Shm, slot::SlotPool},
 };
 use state::WaylandState;
+use text::TextRenderer;
 
 pub fn init(
     height: u32,
     anchor_bottom: bool,
+    monitor: Option<String>,
+    font_path: Option<String>,
 ) -> Result<(WaylandState, EventQueue<WaylandState>, LayerSurface)> {
     let conn = Connection::connect_to_env().context("Failed to connect to Wayland")?;
 
@@ -39,6 +43,10 @@ pub fn init(
     // Init SlotPool
     let pool = SlotPool::new(1920 * 1080 * 4, &shm).context("Failed to create Shm pool")?;
 
+    // Init TextRenderer
+    let text_renderer =
+        TextRenderer::new(font_path.as_deref()).context("Failed to initialize text renderer")?;
+
     let mut state = WaylandState {
         registry_state,
         seat_state,
@@ -53,6 +61,33 @@ pub fn init(
         configured: false,
         width: 0,
         height: 0,
+        text_renderer,
+    };
+
+    // Roundtrip to populate globals (especially outputs)
+    // We need to know about outputs BEFORE creating the layer surface if we want to bind to a specific one
+    event_queue
+        .roundtrip(&mut state)
+        .context("Failed initial roundtrip")?;
+
+    // Find the requested output
+    let output = if let Some(monitor_name) = monitor {
+        if monitor_name == "primary" {
+            None // Use compositor default / primary behavior (often first output, or null)
+        // NOTE: LayerShell spec says if output is NULL, it maps to the "default output" (usually focused).
+        // However, "primary" in config usually implies the "primary monitor" which Wayland doesn't strictly have concept for in core protocol.
+        // Often users just mean "default". If they want a specific one, they use the name.
+        } else {
+            state.output_state.outputs().find(|o| {
+                state
+                    .output_state
+                    .info(o)
+                    .map(|info| info.name == Some(monitor_name.clone()))
+                    .unwrap_or(false)
+            })
+        }
+    } else {
+        None
     };
 
     // Create Layer Surface
@@ -62,7 +97,7 @@ pub fn init(
         surface.clone(),
         Layer::Top,
         Some("kitchnsink"),
-        None,
+        output.as_ref(),
     );
 
     // Initial configuration
@@ -80,9 +115,10 @@ pub fn init(
     state.surface = Some(surface);
 
     // Roundtrip to process initial events (requires mutable state)
-    event_queue
-        .roundtrip(&mut state)
-        .context("Failed initial roundtrip")?;
+    // Roundtrip to process initial events (requires mutable state)
+    // event_queue
+    //    .roundtrip(&mut state)
+    //    .context("Failed initial roundtrip")?;
 
     Ok((state, event_queue, layer_surface))
 }
