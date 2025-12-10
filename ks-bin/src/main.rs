@@ -366,7 +366,11 @@ async fn main() -> Result<()> {
                     &qh,
                     renderer.buffer(),
                     &bar_state.cookbook,
-                    &config.style.bg,
+                    config
+                        .style
+                        .window_bg
+                        .as_deref()
+                        .unwrap_or(&config.style.bg),
                 )?;
                 // trace!("Frame rendered"); // Too noisy
             }

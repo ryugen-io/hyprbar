@@ -58,6 +58,8 @@ fn default_monitor() -> String {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StyleConfig {
+    #[serde(default)]
+    pub window_bg: Option<String>,
     #[serde(default = "default_bg")]
     pub bg: String,
     #[serde(default = "default_fg")]
@@ -78,6 +80,7 @@ pub struct StyleConfig {
 impl Default for StyleConfig {
     fn default() -> Self {
         Self {
+            window_bg: None,
             bg: default_bg(),
             fg: default_fg(),
             accent: None,
