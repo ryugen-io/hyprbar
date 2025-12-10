@@ -5,7 +5,7 @@ use log::debug;
 use ratatui::prelude::*;
 use ratatui::widgets::{Paragraph, Widget};
 use std::time::Duration;
-use tachyonfx::{Effect, Interpolation, Shader, fx};
+use tachyonfx::{Effect, Interpolation, fx};
 
 pub struct BarRenderer {
     buffer: Buffer,
@@ -20,11 +20,11 @@ impl BarRenderer {
         let area = Rect::new(0, 0, width, height);
         // Example startup effect
         // Example startup effect: Fade from Cyan (FG & BG) to default
-        let effects = vec![Effect::new(fx::fade_from(
+        let effects = vec![fx::fade_from(
             Color::Cyan,
             Color::Cyan,
             (800, Interpolation::SineInOut),
-        ))];
+        )];
 
         Self {
             buffer: Buffer::empty(area),

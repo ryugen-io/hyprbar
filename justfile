@@ -21,3 +21,7 @@ fmt:
 # Pre-commit check
 pre-commit: fmt check
     git add .
+
+# Install the binary
+install:
+    cargo install --path ks-bin --force
