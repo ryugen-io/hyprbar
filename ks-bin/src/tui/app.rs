@@ -1,5 +1,5 @@
 use anyhow::Result;
-use kitchn_lib::config::Cookbook;
+use ks_core::config::SinkConfig;
 use ratatui::widgets::ListState;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -9,9 +9,9 @@ pub struct App {
     pub items: Vec<MenuItem>,
     pub state: ListState,
     pub running: bool,
-    pub cookbook: Cookbook,
-    pub last_tick: Instant,
     pub sys: System,
+    pub config: SinkConfig,
+    pub last_tick: Instant,
 }
 
 pub struct MenuItem {
@@ -24,31 +24,38 @@ pub struct MenuItem {
 #[derive(Clone, Copy)]
 pub enum MenuAction {
     ToggleService,
+    EditConfig,
     Quit,
 }
 
 impl App {
-    pub fn new(cookbook: Cookbook) -> App {
-        let mut app = App {
-            items: vec![
-                MenuItem {
-                    label: "Toggle Kitchnsink".to_string(),
-                    action: MenuAction::ToggleService,
-                    description: "Start or Stop the kitchnsink bar".to_string(),
-                },
-                MenuItem {
-                    label: "Quit".to_string(),
-                    action: MenuAction::Quit,
-                    description: "Exit the manager".to_string(),
-                },
-            ],
+    pub fn new(config: SinkConfig) -> App {
+        let items = vec![
+            MenuItem {
+                label: "Toggle Kitchnsink".to_string(),
+                action: MenuAction::ToggleService,
+                description: "Start or Stop the kitchnsink bar".to_string(),
+            },
+            MenuItem {
+                label: "Edit Config".to_string(),
+                action: MenuAction::EditConfig,
+                description: "Open sink.toml in editor".to_string(),
+            },
+            MenuItem {
+                label: "Quit".to_string(),
+                action: MenuAction::Quit,
+                description: "Exit the manager".to_string(),
+            },
+        ];
+        let mut app = Self {
+            items,
             state: ListState::default(),
             running: false,
-            cookbook,
-            last_tick: Instant::now(),
             sys: System::new_with_specifics(
                 RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
             ),
+            config,
+            last_tick: Instant::now(),
         };
         app.state.select(Some(0));
         app.check_process();
@@ -84,21 +91,28 @@ impl App {
     }
 
     pub fn check_process(&mut self) {
-        // Update process list
-        // sysinfo 0.32+: refresh_processes(ProcessesToUpdate, bool)
         self.sys.refresh_processes(ProcessesToUpdate::All, true);
-
-        // Simple check: Look for "kitchnsink" process
         let my_pid = std::process::id();
-        self.running = self.sys.processes().values().any(|p| {
+
+        let found = self.sys.processes().values().find(|p| {
             let name = p.name();
-            // Check for both binary names and potential truncations
+            // Filter zombie processes (status 4 seems to be Zombie in some versions, but let's use the update)
+            // sysinfo 0.37 usages: p.status() returns ProcessStatus
+            let status = p.status();
+            // Filter out Zombies (essential because we are the parent and might not have reaped them)
+            if matches!(status, sysinfo::ProcessStatus::Zombie) {
+                return false;
+            }
+
             (name == "kitchnsink" || name == "ks-bin")
                 && p.pid().as_u32() != my_pid
-                // CMD check: cmd() returns &[String]
-                // Filter out the manager itself
-                && !p.cmd().iter().any(|arg| arg == "manage" || arg == "m")
+                && !p
+                    .cmd()
+                    .iter()
+                    .any(|arg| arg == "manage" || arg == "m" || arg == "internal-watch")
         });
+
+        self.running = found.is_some();
     }
 
     pub fn execute_selected(&mut self) -> Result<bool> {
@@ -108,8 +122,6 @@ impl App {
         match action {
             MenuAction::ToggleService => {
                 if self.running {
-                    // Kill process
-                    // Find and kill external kitchnsink
                     let my_pid = std::process::id();
                     for process in self.sys.processes().values() {
                         let name = process.name();
@@ -124,19 +136,51 @@ impl App {
                         }
                     }
                 } else {
-                    // Start process
                     let self_exe = std::env::current_exe()?;
-                    Command::new(self_exe)
+                    Command::new(&self_exe)
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .spawn()?;
                 }
-                // Wait a bit for propogation
-                std::thread::sleep(Duration::from_millis(200));
+                // Increase wait time
+                std::thread::sleep(Duration::from_millis(500));
                 self.check_process();
-                Ok(false) // Don't quit
+                Ok(false)
             }
-            MenuAction::Quit => Ok(true), // Quit
+            MenuAction::EditConfig => {
+                // 1. Resolve Editor
+                let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+
+                // 2. Resolve Config Path
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                let config_path = std::path::PathBuf::from(home)
+                    .join(".config")
+                    .join("kitchnsink")
+                    .join("sink.toml");
+
+                // 3. Detect Terminal
+                let terminal = std::env::var("TERMINAL").ok().or_else(|| {
+                    let terminals = ["rio", "alacritty", "kitty", "gnome-terminal", "xterm"];
+                    for term in terminals {
+                        if which::which(term).is_ok() {
+                            return Some(term.to_string());
+                        }
+                    }
+                    None
+                });
+
+                // 4. Spawn
+                if let Some(term) = terminal {
+                    Command::new(term)
+                        .arg("-e")
+                        .arg(&editor)
+                        .arg(config_path)
+                        .spawn()?;
+                }
+
+                Ok(false)
+            }
+            MenuAction::Quit => Ok(true),
         }
     }
 }

@@ -273,14 +273,17 @@ async fn run_watcher(socket_path: &Path) -> Result<()> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // 2. Load Sink Config (App Layout) - Load early for TUI
+    let config = load_sink_config();
+
     // 0. Handle Internal Watcher (Client Mode)
     if let Some(cmd) = &cli.command {
         match cmd {
             Commands::InternalWatch { socket_path } => return run_watcher(socket_path).await,
             Commands::Manage => {
-                let cookbook =
-                    Cookbook::load().context("Failed to load kitchn cookbook for TUI")?;
-                return tui::run_tui(cookbook).map_err(|e| anyhow::anyhow!("TUI error: {}", e));
+                // TUI manager
+                // Pass sink_config which contains the theme styles
+                return tui::run_tui(config).map_err(|e| anyhow::anyhow!("TUI error: {}", e));
             }
         }
     }

@@ -9,18 +9,18 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use kitchn_lib::config::Cookbook;
+use ks_core::config::SinkConfig;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 
-pub fn run_tui(cookbook: Cookbook) -> Result<()> {
+pub fn run_tui(config: SinkConfig) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(cookbook);
+    let mut app = App::new(config);
     let res = run_app(&mut terminal, &mut app);
 
     disable_raw_mode()?;
