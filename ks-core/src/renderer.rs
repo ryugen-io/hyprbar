@@ -1,6 +1,6 @@
 use crate::state::BarState;
 use anyhow::Result;
-use kitchn_lib::factory::ColorResolver;
+use k_lib::factory::ColorResolver;
 use log::debug;
 use ratatui::prelude::*;
 use ratatui::widgets::{Paragraph, Widget};

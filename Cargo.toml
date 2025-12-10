@@ -19,7 +19,7 @@ log = "0.4"
 tokio = { version = "1.42", features = ["full"] }
 smithay-client-toolkit = "0.20"
 wayland-client = "0.31"
-kitchn_lib = { path = "../kitchn/crates/kitchn_lib" }
+k-lib = { path = "../kitchn/crates/kitchn_lib" }
 ks-core = { path = "./ks-core" }
 ks-wayland = { path = "./ks-wayland" }
 serde = { version = "1.0", features = ["derive"] }

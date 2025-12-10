@@ -1,5 +1,5 @@
-use kitchn_lib::config::Cookbook;
-use kitchn_lib::factory::ColorResolver;
+use k_lib::config::Cookbook;
+use k_lib::factory::ColorResolver;
 use ratatui::buffer::Buffer;
 use ratatui::style::Color;
 

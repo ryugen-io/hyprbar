@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use kitchn_lib::config::Cookbook;
-use kitchn_lib::logger;
+use k_lib::config::Cookbook;
+use k_lib::logger;
 use ks_core::config::SinkConfig;
 use ks_core::renderer::BarRenderer;
 use ks_core::state::BarState;
@@ -55,9 +55,13 @@ where
             impl tracing::field::Visit for MessageVisitor {
                 fn record_debug(
                     &mut self,
-                    _field: &tracing::field::Field,
-                    _value: &dyn std::fmt::Debug,
+                    field: &tracing::field::Field,
+                    value: &dyn std::fmt::Debug,
                 ) {
+                    if field.name() == "message" {
+                        // Tracing messages use fmt::Arguments which print correctly via Debug
+                        self.0.push_str(&format!("{:?}", value));
+                    }
                 }
                 fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
                     if field.name() == "message" {
@@ -145,8 +149,8 @@ fn init_logging(enable_debug: bool) -> Result<()> {
     let socket_layer = SocketSubscriberLayer;
 
     // We can also add a stdout layer for local debugging if needed,
-    // but kitchn philosophy relies on the socket or kitchn_lib logger.
-    // However, kitchn_lib logger uses 'log' crate.
+    // but kitchn philosophy relies on the socket or k_lib logger.
+    // However, k_lib logger uses 'log' crate.
     // Tracing captures 'log' events via 'tracing-log' (usually enabled by default or feature).
     // Let's add a basic Fmt layer for stderr as fallback/standard behavior.
     let fmt_layer = tracing_subscriber::fmt::layer()

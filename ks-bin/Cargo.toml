@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 ks-core = { workspace = true }
 ks-wayland = { workspace = true }
-kitchn_lib = { workspace = true }
+k-lib = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 tokio = { workspace = true }

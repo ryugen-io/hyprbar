@@ -1,6 +1,6 @@
 use crate::blitter::blit_buffer_to_pixels;
 use anyhow::Context;
-use kitchn_lib::config::Cookbook;
+use k_lib::config::Cookbook;
 use ratatui::buffer::Buffer;
 use smithay_client_toolkit::reexports::client::protocol::wl_shm;
 use smithay_client_toolkit::{

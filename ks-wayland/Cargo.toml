@@ -10,4 +10,4 @@ ratatui = { workspace = true }
 log = { workspace = true }
 anyhow = { workspace = true }
 thiserror = "2.0"
-kitchn_lib = { workspace = true }
+k-lib = { workspace = true }

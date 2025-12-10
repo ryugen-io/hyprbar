@@ -1,5 +1,5 @@
 use crate::config::SinkConfig;
-use kitchn_lib::config::Cookbook;
+use k_lib::config::Cookbook;
 
 #[derive(Debug)]
 pub struct BarState {
