@@ -37,3 +37,8 @@ dwash:
 # Dev helper: load plugins from .load
 dload:
     @./ksdev --load
+
+# Clean build artifacts
+clean:
+    cargo clean
+    rm -rf .wash .load
