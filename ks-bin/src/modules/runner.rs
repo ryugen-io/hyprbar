@@ -4,12 +4,13 @@ use ks_core::config::SinkConfig;
 use ks_core::renderer::BarRenderer;
 use ks_core::state::BarState;
 use ks_wayland::init as init_wayland;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::time::Duration;
 
 use crate::plugin_loader::PluginManager;
 
 pub fn run_server(cookbook: Cookbook, config: SinkConfig) -> Result<()> {
+    let cookbook = std::sync::Arc::new(cookbook);
     // Pre-fetch log strings (Cookbook consumed later)
     let get_msg = |key: &str, default: &str| -> String {
         cookbook
@@ -29,14 +30,16 @@ pub fn run_server(cookbook: Cookbook, config: SinkConfig) -> Result<()> {
     let msg_sigint = get_msg("sink_sigint", "Received SIGINT, shutting down...");
 
     // Spawn Signal Handler
+    let signal_cookbook = cookbook.clone();
     tokio::spawn(async move {
+        use k_lib::logger;
         use tokio::signal::unix::{SignalKind, signal};
         let mut term = signal(SignalKind::terminate()).unwrap();
         let mut int = signal(SignalKind::interrupt()).unwrap();
 
         tokio::select! {
-            _ = term.recv() => info!("{}", msg_sigterm),
-            _ = int.recv() => info!("{}", msg_sigint),
+            _ = term.recv() => logger::log_to_terminal(&signal_cookbook, "info", "SINK", &msg_sigterm),
+            _ = int.recv() => logger::log_to_terminal(&signal_cookbook, "info", "SINK", &msg_sigint),
         }
 
         // Give a tiny bit of time for logs to flush if needed, though they are broadcast immediately
@@ -59,7 +62,7 @@ pub fn run_server(cookbook: Cookbook, config: SinkConfig) -> Result<()> {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().is_some_and(|ext| ext == "dish")
-                    && let Err(e) = plugin_manager.load_plugin(&path)
+                    && let Err(e) = plugin_manager.load_plugin(&path, true, true)
                 {
                     error!("Failed to load plugin {:?}: {}", path, e);
                 }
@@ -86,12 +89,12 @@ pub fn run_server(cookbook: Cookbook, config: SinkConfig) -> Result<()> {
     let qh = event_queue.handle();
 
     // 7. Event Loop
-    // Use standard tracing::info! instead of logger::log_to_terminal to verify our stream
-    info!("{}", msg_loop);
+    // Use logger to match system theme
+    k_lib::logger::log_to_terminal(&bar_state.cookbook, "info", "SINK", &msg_loop);
 
     loop {
         if wayland_state.exit {
-            info!("{}", msg_exit);
+            k_lib::logger::log_to_terminal(&bar_state.cookbook, "info", "SINK", &msg_exit);
             break;
         }
 

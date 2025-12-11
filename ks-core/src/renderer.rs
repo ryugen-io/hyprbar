@@ -122,25 +122,28 @@ impl BarRenderer {
         Self::render_section(
             &mut self.buffer,
             chunks[0],
-            &self.left_dishes,
+            &mut self.left_dishes,
             state,
             Alignment::Left,
+            dt,
         );
         // Render Center
         Self::render_section(
             &mut self.buffer,
             chunks[1],
-            &self.center_dishes,
+            &mut self.center_dishes,
             state,
             Alignment::Center,
+            dt,
         );
         // Render Right
         Self::render_section(
             &mut self.buffer,
             chunks[2],
-            &self.right_dishes,
+            &mut self.right_dishes,
             state,
             Alignment::Right,
+            dt,
         );
 
         // Apply effects
@@ -155,9 +158,10 @@ impl BarRenderer {
     fn render_section(
         buffer: &mut Buffer,
         area: Rect,
-        dishes: &[Box<dyn Dish>],
+        dishes: &mut [Box<dyn Dish>],
         state: &BarState,
         align: Alignment,
+        dt: Duration,
     ) {
         if dishes.is_empty() {
             return;
@@ -175,13 +179,13 @@ impl BarRenderer {
             Alignment::Right => area.x + area.width.saturating_sub(total_width),
         };
 
-        for (i, dish) in dishes.iter().enumerate() {
+        for (i, dish) in dishes.iter_mut().enumerate() {
             let w = dish_widths[i];
             let render_area = Rect::new(current_x, area.y, w, area.height);
             // Ensure we don't draw outside chunk
             let intersection = render_area.intersection(area);
             if !intersection.is_empty() {
-                dish.render(intersection, buffer, state);
+                dish.render(intersection, buffer, state, dt);
             }
             current_x += w;
         }

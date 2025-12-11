@@ -9,7 +9,34 @@ pub struct SinkConfig {
     #[serde(default)]
     pub layout: LayoutConfig,
     #[serde(default)]
+    pub logging: LoggingConfig,
+    #[serde(default)]
     pub dish: std::collections::HashMap<String, toml::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LoggingConfig {
+    #[serde(default = "default_log_level")]
+    pub level: String,
+    #[serde(default = "default_debug_filter")]
+    pub debug_filter: String,
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            level: default_log_level(),
+            debug_filter: default_debug_filter(),
+        }
+    }
+}
+
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
+fn default_debug_filter() -> String {
+    "info,ks_bin=debug,ks_core=debug,ks_wayland=debug".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

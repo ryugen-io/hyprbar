@@ -79,7 +79,11 @@ where
     }
 }
 
-pub fn init_logging(enable_debug: bool) -> anyhow::Result<()> {
+pub fn init_logging(
+    enable_debug: bool,
+    config_level: &str,
+    config_filter: &str,
+) -> anyhow::Result<()> {
     // 0. Setup LogTracer is handled by SubscriberInitExt::init() below
     // tracing_log::LogTracer::init().map_err(|_| anyhow::anyhow!("Failed to init LogTracer"))?;
 
@@ -99,12 +103,12 @@ pub fn init_logging(enable_debug: bool) -> anyhow::Result<()> {
 
     // 3. Setup Tracing Subscriber
     let env_filter = tracing_subscriber::EnvFilter::builder()
-        .with_default_directive(if enable_debug {
-            tracing::Level::DEBUG.into()
+        .with_default_directive(tracing::Level::INFO.into())
+        .parse_lossy(if enable_debug {
+            config_filter
         } else {
-            tracing::Level::INFO.into()
-        })
-        .parse_lossy(""); // Parse empty string to use default directive
+            config_level
+        });
 
     let socket_layer = SocketSubscriberLayer;
 

@@ -11,7 +11,25 @@
     -   Fully async IO using `tokio::fs` and `tokio::process`.
 
 ## Dish System (Modular Widgets)
-The bar uses a plugin-based "Dish" architecture (`ks-core/src/dish.rs`):
+The bar uses a plugin-based "Dish" architecture (`ks-core/src/dish.rs`) with a robust Registry and Metadata system:
+
+### 1. Metadata Headers
+Plugins (Dishes) declare metadata directly in their source (`.rs`) files using comments:
+```rust
+//! Name: Battery Widget
+//! Version: 1.0.0
+//! Author: Ryu
+//! Description: A battery indicator
+```
+These are parsed at build time and embedded into the binary.
+
+### 2. Registry (`registry.bin`)
+`ks-bin` maintains a persistent binary registry of installed plugins at `~/.local/share/kitchnsink/dishes/registry.bin`. This tracks:
+- Installation path
+- Enabled/Disabled status
+- Metadata (Version, Author, etc.)
+
+### 3. Dish Trait
 -   **Dish Trait**: Defines `render()` and `width()` for all components.
 -   **Layout**: `sink.toml` defines `modules_left`, `modules_center`, `modules_right` lists.
 -   **Configuration**: Specific settings (e.g., text content, symbols) live in `[dish.<name>]` sections of `sink.toml`.

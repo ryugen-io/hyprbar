@@ -1,3 +1,8 @@
+//! Name: Battery Widget
+//! Version: 1.2.0
+//! Author: Ryu
+//! Description: Shows battery status with configurable colors
+
 use ks_core::prelude::*;
 
 pub struct BatteryDish {
@@ -69,7 +74,7 @@ impl Dish for BatteryDish {
         }
     }
 
-    fn render(&self, area: Rect, buf: &mut Buffer, state: &BarState) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
         if area.width == 0 || area.height == 0 {
             return;
         }
@@ -87,7 +92,7 @@ impl Dish for BatteryDish {
 
         // Check for config overrides in [dish.battery]
         let battery_config = state.config.dish.get("battery").and_then(|v| v.as_table());
-        
+
         let resolve_override = |key: &str, fallback: Option<Color>| -> Option<Color> {
             battery_config
                 .and_then(|t| t.get(key))
@@ -99,25 +104,28 @@ impl Dish for BatteryDish {
                 .or(fallback)
         };
 
-        let success_color = resolve_override("color_high", 
+        let success_color = resolve_override(
+            "color_high",
             state.config.style.success.as_deref().map(|s| {
                 let c = ColorResolver::hex_to_color(s);
                 Color::Rgb(c.r, c.g, c.b)
-            })
+            }),
         );
 
-        let warning_color = resolve_override("color_medium", 
+        let warning_color = resolve_override(
+            "color_medium",
             state.config.style.secondary.as_deref().map(|s| {
                 let c = ColorResolver::hex_to_color(s);
                 Color::Rgb(c.r, c.g, c.b)
-            })
+            }),
         );
 
-        let error_color = resolve_override("color_low", 
+        let error_color = resolve_override(
+            "color_low",
             state.config.style.error.as_deref().map(|s| {
                 let c = ColorResolver::hex_to_color(s);
                 Color::Rgb(c.r, c.g, c.b)
-            })
+            }),
         );
 
         let accent_color = state.config.style.accent.as_deref().map(|s| {

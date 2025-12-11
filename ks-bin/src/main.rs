@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use colored::Colorize;
 use k_lib::config::Cookbook;
 use k_lib::logger;
 
@@ -34,10 +35,17 @@ async fn main() -> Result<()> {
     // 1. Load Kitchn Config (Global Styles)
     let cookbook = Cookbook::load().context("Failed to load kitchn cookbook")?;
 
-    // 2. Load Sink Config (App Layout)
+    // 2. Load Sink Config (App Layout & Logging)
     let sink_config = config::load_sink_config();
 
-    // 0. Handle Internal Watcher (Client Mode) & other commands
+    // 3. Initialize Logging (after config load)
+    logging::init_logging(
+        cli.debug,
+        &sink_config.logging.level,
+        &sink_config.logging.debug_filter,
+    )?;
+
+    // 4. Handle Subcommands
     if let Some(cmd) = &cli.command {
         match cmd {
             Commands::InternalWatch { socket_path } => {
@@ -53,6 +61,41 @@ async fn main() -> Result<()> {
             }
             Commands::Wash { path } => return build::wash_dish(path, &cookbook).await,
             Commands::Load { path } => return install::load_dish(path, &cookbook).await,
+            Commands::List => {
+                use crate::modules::registry::Registry;
+                let registry = Registry::load()?;
+                println!("Installed Plugins:");
+                for (name, entry) in registry.plugins {
+                    let status = if entry.enabled {
+                        "Enabled".green()
+                    } else {
+                        "Disabled".red()
+                    };
+                    println!("  - {}: {} ({})", name, status, entry.path.display());
+                    if !entry.metadata.version.is_empty() {
+                        println!(
+                            "    v{} by {}",
+                            entry.metadata.version, entry.metadata.author
+                        );
+                        println!("    {}", entry.metadata.description);
+                    }
+                }
+                return Ok(());
+            }
+            Commands::Enable { name } => {
+                use crate::modules::registry::Registry;
+                let mut registry = Registry::load()?;
+                registry.enable(name)?;
+                println!("Plugin '{}' enabled.", name);
+                return Ok(());
+            }
+            Commands::Disable { name } => {
+                use crate::modules::registry::Registry;
+                let mut registry = Registry::load()?;
+                registry.disable(name)?;
+                println!("Plugin '{}' disabled.", name);
+                return Ok(());
+            }
         }
     }
 
@@ -62,9 +105,6 @@ async fn main() -> Result<()> {
         .get("sink_startup")
         .map(|p| p.msg.clone())
         .unwrap_or_else(|| "kitchnsink starting...".to_string());
-
-    // 3. Initialize Logging
-    logging::init_logging(cli.debug)?;
 
     logger::log_to_terminal(&cookbook, "info", "SINK", &start_msg);
 

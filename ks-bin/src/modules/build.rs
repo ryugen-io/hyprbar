@@ -92,8 +92,71 @@ pub async fn wash_dish(path: &Path, cookbook: &Cookbook) -> Result<()> {
         return Err(anyhow::anyhow!("Failed to add ratatui"));
     }
 
-    // 4. Copy source file
-    fs::copy(path, temp_dir.join("src/lib.rs")).await?;
+    // Add tachyonfx
+    let status = Command::new("cargo")
+        .arg("add")
+        .arg("tachyonfx@0.21.0")
+        .current_dir(&temp_dir)
+        .status()
+        .await
+        .context("Failed to add tachyonfx dependency")?;
+
+    if !status.success() {
+        return Err(anyhow::anyhow!("Failed to add tachyonfx"));
+    }
+
+    // 4. Parse Metadata & Append Code
+    let source_content = fs::read_to_string(path).await?;
+    let mut metadata_json = serde_json::json!({
+        "name": "Unknown",
+        "description": "",
+        "author": "",
+        "version": "0.0.1"
+    });
+
+    for line in source_content.lines() {
+        if let Some(comment) = line.trim().strip_prefix("//!")
+            && let Some((key, value)) = comment.split_once(':')
+        {
+            let key = key.trim().to_lowercase();
+            let value = value.trim();
+            if let Some(obj) = metadata_json.as_object_mut()
+                && obj.contains_key(&key)
+            {
+                obj[&key] = serde_json::Value::String(value.to_string());
+            }
+        }
+    }
+
+    let json_str = metadata_json.to_string();
+    // Escape quote for C string literal if needed (serde_json to_string produces valid JSON string, but we are putting it into a Rust string literal.
+    // Actually, we can use a raw string literal if we are careful, or just escape quotes.
+    // JSON dquote is \". Rust string needs \\".
+    // Safest is to use raw string literal `b"..."` for bytes.
+    // But if JSON contains `"` it's fine inside standard string if escaped.
+    // Let's rely on format! debug which escapes? No.
+    // We construct the source code string.
+
+    // Proper JSON string escaping for Rust source code:
+    // " -> \"
+    let escaped_json = json_str.replace('"', "\\\"");
+
+    let injected_code = format!(
+        r#"
+#[unsafe(no_mangle)]
+pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {{
+    static META: &[u8] = b"{}\0";
+    META.as_ptr() as *const _
+}}
+"#,
+        escaped_json
+    );
+
+    let mut final_source = source_content;
+    final_source.push_str(&injected_code);
+
+    let src_path = temp_dir.join("src/lib.rs");
+    fs::write(&src_path, final_source).await?;
 
     // 5. Build
     logger::log_to_terminal(cookbook, "info", "WASH", "Running cargo build...");

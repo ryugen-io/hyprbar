@@ -35,8 +35,8 @@ fn main() raises:
                 
                 # Construct python list for subprocess
                 var run_cmd = builtins.list()
-                var _ = run_cmd.append("ks-bin")
-                var _ = run_cmd.append("wash")
+                var _ = run_cmd.append("mojo")
+                var _ = run_cmd.append("tools/wash.mojo")
                 var _ = run_cmd.append(src_path)
                 
                 var result = subprocess.run(run_cmd, capture_output=True, text=True)

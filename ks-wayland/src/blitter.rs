@@ -2,7 +2,7 @@ use crate::text::TextRenderer;
 use cosmic_text::{Attrs, Buffer, Color as CosmicColor, Family, Metrics, Shaping};
 use k_lib::config::Cookbook;
 use k_lib::factory::ColorResolver;
-use log::debug;
+
 use ratatui::buffer::Buffer as RatatuiBuffer;
 use ratatui::style::Color;
 
@@ -98,18 +98,6 @@ pub fn blit_buffer_to_pixels(
 
         // Flush end of row
         if !current_run.is_empty() {
-            debug!(
-                "flush_run: fg={:?}, bg={:?}, width={}, text='{}' ({})",
-                current_fg,
-                current_bg,
-                grid_width - run_start_x,
-                current_run,
-                if current_run.is_empty() {
-                    "empty"
-                } else {
-                    "content"
-                }
-            );
             flush_run(
                 &current_run,
                 run_start_x,

@@ -9,7 +9,7 @@ pub trait Dish: Send + Sync {
 
     /// Render the dish into the specified area.
     /// The dish should only draw within the bounds of `area`.
-    fn render(&self, area: Rect, buf: &mut Buffer, state: &BarState);
+    fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, dt: std::time::Duration);
 
     /// Update the dish state. called every frame.
     fn update(&mut self, _dt: std::time::Duration) {}

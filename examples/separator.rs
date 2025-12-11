@@ -32,7 +32,7 @@ impl Dish for Separator {
 
     fn update(&mut self, _dt: std::time::Duration) {}
 
-    fn render(&self, area: Rect, buf: &mut Buffer, state: &BarState) {
+    fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
         let symbol = state
             .config
             .dish

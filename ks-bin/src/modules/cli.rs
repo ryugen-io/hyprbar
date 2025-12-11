@@ -39,4 +39,22 @@ pub enum Commands {
         /// Path to the .dish file
         path: PathBuf,
     },
+
+    /// List installed plugins
+    #[command(alias = "ls")]
+    List,
+
+    /// Enable a plugin
+    #[command(alias = "on")]
+    Enable {
+        /// Name of the plugin (e.g. "battery.dish")
+        name: String,
+    },
+
+    /// Disable a plugin
+    #[command(alias = "off")]
+    Disable {
+        /// Name of the plugin
+        name: String,
+    },
 }
