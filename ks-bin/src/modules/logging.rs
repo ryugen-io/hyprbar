@@ -79,13 +79,89 @@ where
     }
 }
 
+use k_lib::config::Cookbook;
+use k_lib::logger;
+use std::sync::Arc;
+
+/// Layer that forwards logs to kitchn_lib's file logger
+struct KitchnFileLayer {
+    cookbook: Arc<Cookbook>,
+}
+
+impl<S> Layer<S> for KitchnFileLayer
+where
+    S: tracing::Subscriber,
+{
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        // Skip if not writing by default, unless overriden?
+        // For now, we respect the global config directly in log_to_file call or here.
+        // k_lib::logger::log_to_file doesn't check 'write_by_default', it just writes.
+        // So we should check it here.
+        if !self.cookbook.layout.logging.write_by_default {
+            return;
+        }
+
+        let metadata = event.metadata();
+        let level_str = metadata.level().as_str().to_lowercase();
+
+        // Visitor to extract message field
+        struct MessageVisitor(String);
+        impl tracing::field::Visit for MessageVisitor {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                if field.name() == "message" {
+                    self.0.push_str(&format!("{:?}", value));
+                }
+            }
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                if field.name() == "message" {
+                    self.0.push_str(value);
+                }
+            }
+        }
+
+        let mut visitor = MessageVisitor(String::new());
+        event.record(&mut visitor);
+        let message = visitor.0;
+
+        // Determine scope - currently hardcoded or extracted?
+        // We can use target as scope, or a fixed "SINK" scope.
+        // Let's use target for now, but clean it up maybe?
+        let target = metadata.target();
+        // If target is module path, it might be too long.
+        // For now, let's stick to "SINK" for consistency with main.rs,
+        // OR use "SINK" if target starts with "ks_", otherwise use target.
+        let scope = if target.starts_with("ks_") || target == "ks_bin" {
+            "SINK"
+        } else {
+            target
+        };
+
+        // We use the synchronous log_to_file.
+        // NOTE: This might block the async runtime if disk is slow.
+        // Ideally this should be done in a separate blocking task or thread,
+        // but for now strictly following the request to use k_lib directly.
+        let _ = logger::log_to_file(
+            &self.cookbook,
+            &level_str,
+            scope,
+            &message,
+            Some("kitchnsink"), // Enforce app name
+        );
+    }
+}
+
 pub fn init_logging(
+    cookbook: Arc<Cookbook>,
     enable_debug: bool,
     config_level: &str,
     config_filter: &str,
 ) -> anyhow::Result<()> {
-    // 0. Setup LogTracer is handled by SubscriberInitExt::init() below
-    // tracing_log::LogTracer::init().map_err(|_| anyhow::anyhow!("Failed to init LogTracer"))?;
+    // 0. Setup LogTracer to capture log::* events from plugins/k_lib
+    tracing_log::LogTracer::init().map_err(|_| anyhow::anyhow!("Failed to init LogTracer"))?;
 
     // Force colored output even if no TTY (daemon mode)
     colored::control::set_override(true);
@@ -122,10 +198,15 @@ pub fn init_logging(
         .with_target(false)
         .without_time(); // Time is handled by our socket layer or rely on systemd
 
+    let file_layer = KitchnFileLayer {
+        cookbook, // passed as Arc already
+    };
+
     tracing_subscriber::registry()
         .with(env_filter)
         .with(fmt_layer)
         .with(socket_layer)
+        .with(file_layer)
         .init();
 
     // 4. Start Socket Server if debug is enabled

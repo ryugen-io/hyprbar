@@ -60,3 +60,10 @@ let msg = cookbook.dictionary.presets.get("sink_startup").map(|p| p.msg.clone())
 **Key Conventions**:
 -   See `code-style-guide.md` (PascalCase structs, snake_case fns, `anyhow` errors).
 -   `kitchn` presets for logging/UI.
+
+### Logging Architecture
+-   **Tracing**: Primary logging facade. Captures logs from `ks-bin`, `ks-core`, and plugins (via `LogTracer`).
+-   **File Logging**: Integrated with `kitchn_lib` via a custom `KitchnFileLayer`.
+    -   Logs match `kitchn` ecosystem structure (e.g., `~/.local/state/kitchn/logs/...`).
+    -   Shared `Arc<Cookbook>` ownership model to support file paths and formatting.
+

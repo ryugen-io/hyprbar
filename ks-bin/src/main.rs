@@ -33,13 +33,14 @@ async fn main() -> Result<()> {
     }
 
     // 1. Load Kitchn Config (Global Styles)
-    let cookbook = Cookbook::load().context("Failed to load kitchn cookbook")?;
+    let cookbook = std::sync::Arc::new(Cookbook::load().context("Failed to load kitchn cookbook")?);
 
     // 2. Load Sink Config (App Layout & Logging)
     let sink_config = config::load_sink_config();
 
     // 3. Initialize Logging (after config load)
     logging::init_logging(
+        cookbook.clone(),
         cli.debug,
         &sink_config.logging.level,
         &sink_config.logging.debug_filter,

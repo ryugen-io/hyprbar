@@ -9,8 +9,10 @@ use std::time::Duration;
 
 use crate::plugin_loader::PluginManager;
 
-pub fn run_server(cookbook: Cookbook, config: SinkConfig) -> Result<()> {
-    let cookbook = std::sync::Arc::new(cookbook);
+use std::sync::Arc;
+
+pub fn run_server(cookbook: Arc<Cookbook>, config: SinkConfig) -> Result<()> {
+    // let cookbook = std::sync::Arc::new(cookbook); // Removed, passed as Arc directly
     // Pre-fetch log strings (Cookbook consumed later)
     let get_msg = |key: &str, default: &str| -> String {
         cookbook
