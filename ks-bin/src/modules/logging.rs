@@ -160,8 +160,8 @@ pub fn init_logging(
     config_level: &str,
     config_filter: &str,
 ) -> anyhow::Result<()> {
-    // 0. Setup LogTracer to capture log::* events from plugins/k_lib
-    tracing_log::LogTracer::init().map_err(|_| anyhow::anyhow!("Failed to init LogTracer"))?;
+    // 0. Setup LogTracer (Handled automatically by registry().init() if tracing-log feature is enabled)
+    // tracing_log::LogTracer::init().map_err(|_| anyhow::anyhow!("Failed to init LogTracer"))?;
 
     // Force colored output even if no TTY (daemon mode)
     colored::control::set_override(true);
