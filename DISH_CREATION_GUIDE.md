@@ -23,7 +23,26 @@ Add the following block to the top of your file to identify your plugin:
 //! Version: 1.0.0
 //! Author: Your Name
 //! Description: Demonstrating all features
+//! Dependency: chrono = "0.4"
 ```
+
+### Dependency Management
+Use `//! Dependency:` lines to include external crates. The build tool (`wash`) will automatically add them to the temporary `Cargo.toml`.
+
+Format: `//! Dependency: crate = "version"`
+
+### Adding Dependencies
+You can now define external crate dependencies directly in your source file using the `//! Dependency:` syntax. These will be automatically injected during the build process.
+
+**Format:** `//! Dependency: crate_name = "version"`
+
+Example:
+```rust
+//! Dependency: serde = { version = "1.0", features = ["derive"] }
+//! Dependency: reqwest = { version = "0.11", features = ["blocking"] }
+```
+
+> **Note**: `kitchnsink` pre-includes `ks-core`, `ratatui`, and `tachyonfx`. You only need to declare *extra* crates.
 
 ## 3. Creating the State Struct
 

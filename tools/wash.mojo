@@ -28,6 +28,9 @@ fn main() raises:
     metadata_dict["author"] = ""
     metadata_dict["version"] = "0.0.1"
 
+    # Collect plugin dependencies
+    var extra_deps = Python.list()
+
     var lines = source_content_py.splitlines()
     for line in lines:
         var stripped = line.strip()
@@ -37,7 +40,11 @@ fn main() raises:
                 var parts = content.split(":", 1)
                 var key = parts[0].strip().lower()
                 var value = parts[1].strip()
-                metadata_dict[key] = value
+                # Handle dependencies separately
+                if key == "dependency":
+                    extra_deps.append(value)
+                else:
+                    metadata_dict[key] = value
 
     var json_str = String(json.dumps(metadata_dict))
     var escaped_json = json_str.replace('"', '\\"')
@@ -73,6 +80,10 @@ ks-core = { path = "../../ks-core" }
 ratatui = "0.29.0"
 tachyonfx = { version = "0.21.0", features = ["std-duration"] }
 """
+    # Append plugin-specific dependencies
+    for dep in extra_deps:
+        cargo_toml = cargo_toml + String(dep) + "\n"
+
     var f_toml = builtins.open(temp_dir + "/Cargo.toml", "w")
     f_toml.write(cargo_toml)
     f_toml.close()

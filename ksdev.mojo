@@ -141,6 +141,13 @@ fn main() raises:
                 found_author = True
             elif line.startswith("//! Description:"):
                 found_desc = True
+            elif line.startswith("//! Dependency:"):
+                var dep_content = line[15:]
+                if "=" in dep_content:
+                     print(ICON_CHECK + " Found Dependency:", C_BLUE + dep_content.strip() + C_RESET)
+                else:
+                     print(ICON_WARN + " Invalid Dependency format:", line)
+                     print("  Expected format: //! Dependency: crate = \"version\"")
         
         var all_ok = True
         

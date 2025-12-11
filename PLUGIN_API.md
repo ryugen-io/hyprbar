@@ -97,6 +97,13 @@ use ks_core::prelude::*;
 
 struct MyPlugin;
 
+// Metadata must be included at the top of the file!
+//! Name: My Plugin
+//! Version: 0.1.0
+//! Author: Me
+//! Description: A test plugin
+//! Dependency: chrono = "0.4"
+
 impl Dish for MyPlugin {
     fn name(&self) -> &str { "MyPlugin" }
     fn update(&mut self, _: Duration) {}

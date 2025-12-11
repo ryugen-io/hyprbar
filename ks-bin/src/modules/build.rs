@@ -114,17 +114,57 @@ pub async fn wash_dish(path: &Path, cookbook: &Cookbook) -> Result<()> {
         "version": "0.0.1"
     });
 
+    let mut dependencies = Vec::new();
+
     for line in source_content.lines() {
         if let Some(comment) = line.trim().strip_prefix("//!")
             && let Some((key, value)) = comment.split_once(':')
         {
             let key = key.trim().to_lowercase();
             let value = value.trim();
-            if let Some(obj) = metadata_json.as_object_mut()
+
+            if key == "dependency" {
+                // Format: crate = "version" or crate = { ... }
+                // We need to parse this string to get the crate name for `cargo add`.
+                // However, `cargo add` expects `cargo add name@version` or similar.
+                // The format in the file is likely `name = "version"`.
+                // For simplest integration with `cargo add`, we might need to parse the key/value from the string.
+                // But wait, `cargo add` is robust.
+                // Actually, the `wash.mojo` simply injects them into Cargo.toml.
+                // Here we are using `cargo add` commands.
+                // Let's parse the `name = "version"` string.
+                if let Some((dep_name, dep_version)) = value.split_once('=') {
+                    let dep_name = dep_name.trim();
+                    let dep_version = dep_version.trim().trim_matches('"').trim_matches('\'');
+                    dependencies.push((dep_name.to_string(), dep_version.to_string()));
+                }
+            } else if let Some(obj) = metadata_json.as_object_mut()
                 && obj.contains_key(&key)
             {
                 obj[&key] = serde_json::Value::String(value.to_string());
             }
+        }
+    }
+
+    // 4b. Install Custom Dependencies
+    for (dep_name, dep_version) in dependencies {
+        logger::log_to_terminal(
+            cookbook,
+            "info",
+            "WASH",
+            &format!("Adding dependency: {} = {}", dep_name, dep_version),
+        );
+
+        let status = Command::new("cargo")
+            .arg("add")
+            .arg(format!("{}@{}", dep_name, dep_version))
+            .current_dir(&temp_dir)
+            .status()
+            .await
+            .context(format!("Failed to add dependency {}", dep_name))?;
+
+        if !status.success() {
+            return Err(anyhow::anyhow!("Failed to add dependency: {}", dep_name));
         }
     }
 
