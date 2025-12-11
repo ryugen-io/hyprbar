@@ -16,6 +16,12 @@ pub trait Dish: Send + Sync {
 
     /// Return the required width of the dish.
     fn width(&self, state: &BarState) -> u16;
+
+    /// Set the instance configuration name (alias).
+    /// Used when a dish is instantiated multiple times with different configs (e.g. "TextArea#2").
+    /// The dish should use this name to look up its configuration in `state.config.dish`.
+    #[allow(unused_variables)]
+    fn set_instance_config(&mut self, name: String) {}
 }
 
 /// A provider that creates dishes by name.

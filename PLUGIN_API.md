@@ -12,11 +12,35 @@ Plugins implement the `Dish` trait. A plugin corresponds to a "dish" in the "kit
 pub trait Dish: Send + Sync {
     fn name(&self) -> &str;
     fn update(&mut self, dt: Duration);
+    /// Return the required width of the dish (e.g. for calculating layout).
     fn width(&self, state: &BarState) -> u16;
     fn render(&self, area: Rect, buf: &mut Buffer, state: &BarState);
+
+    /// Optional: Set the instance configuration name.
+    /// Implement this if your dish supports multiple instances (e.g. "TextArea#2").
+    /// Store this name and use it to look up configuration instead of the hardcoded name.
+    #[allow(unused_variables)]
+    fn set_instance_config(&mut self, name: String) {}
 }
 ```
 
+### Supporting Multiple Instances (Aliasing)
+
+If you want your Dish to be usable multiple times with different configurations (e.g. `[dish.Clock]` and `[dish.Clock2]`), implement `set_instance_config`:
+
+```rust
+struct MyDish {
+    config_name: String,
+}
+
+impl Dish for MyDish {
+    fn set_instance_config(&mut self, name: String) {
+        self.config_name = name;
+    }
+    
+    // In render/width, use self.config_name instead of "MyDish"
+}
+```
 - **name()**: Returns the display name of the plugin (mostly for debugging).
 - **update(dt)**: Called periodically with the delta time. Use this to poll system stats, but avoid blocking operations!
 - **width(state)**: Returns the width in characters that the plugin needs.

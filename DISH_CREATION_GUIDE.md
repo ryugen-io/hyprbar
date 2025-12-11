@@ -164,6 +164,40 @@ pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
         label: "My Dish".to_string(),
     })
 }
+    })
+}
+```
+
+## 6. Supporting Multiple Instances (Optional)
+
+If you want users to be able to use your Dish multiple times with different configurations (e.g. `[dish.Clock1]` and `[dish.Clock2]`), you can implement the `set_instance_config` method.
+
+In `sink.toml`, users can then write:
+```toml
+# Layout
+modules_right = ["MyDish#Instance1", "MyDish#Instance2"]
+
+[dish.Instance1]
+header = "WORK"
+
+[dish.Instance2]
+header = "HOME"
+```
+
+In your code:
+```rust
+impl Dish for MyDish {
+    // ...
+    fn set_instance_config(&mut self, name: String) {
+        // Store the alias (e.g. "Instance1") to look up config later
+        self.config_key = name; 
+    }
+    
+    fn render(...) {
+        // Use self.config_key instead of "MyDish"
+        let header = state.config.dish.get(&self.config_key)...
+    }
+}
 ```
 
 

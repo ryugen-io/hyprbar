@@ -69,9 +69,24 @@ impl BarRenderer {
             .map(|p| p.msg.clone())
             .unwrap_or_else(|| "Loaded Dish: {0} (Type: {1})".to_string());
 
-        for name in names {
-            if let Some(plugin_dish) = provider.create_dish(name) {
-                let msg = log_fmt.replace("{0}", name).replace("{1}", "Plugin");
+        for raw_name in names {
+            let (name, alias) = raw_name
+                .split_once('#')
+                .unwrap_or((raw_name.as_str(), raw_name.as_str()));
+
+            if let Some(mut plugin_dish) = provider.create_dish(name) {
+                // Configure instance alias
+                plugin_dish.set_instance_config(alias.to_string());
+
+                let display_name = if name != alias {
+                    format!("{} as {}", name, alias)
+                } else {
+                    name.to_string()
+                };
+
+                let msg = log_fmt
+                    .replace("{0}", &display_name)
+                    .replace("{1}", "Plugin");
                 log::info!("{}", msg);
                 dishes.push(plugin_dish);
             } else {
