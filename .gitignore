@@ -12,3 +12,8 @@ in-memoria.db
 # Artifacts
 *.dish
 *.so
+
+# Dev tools
+ksdev
+.wash/
+.load/

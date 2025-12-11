@@ -98,6 +98,18 @@ pub fn blit_buffer_to_pixels(
 
         // Flush end of row
         if !current_run.is_empty() {
+            debug!(
+                "flush_run: fg={:?}, bg={:?}, width={}, text='{}' ({})",
+                current_fg,
+                current_bg,
+                grid_width - run_start_x,
+                current_run,
+                if current_run.is_empty() {
+                    "empty"
+                } else {
+                    "content"
+                }
+            );
             flush_run(
                 &current_run,
                 run_start_x,
@@ -144,10 +156,10 @@ fn flush_run(
     let resolved_fg = resolve_color(fg, cookbook, Color::White);
     let resolved_bg = resolve_color(bg, cookbook, Color::Reset); // Reset means transparent/default
 
-    debug!(
+    /* debug!(
         "Flush run: '{}' (fg={:?}->{:?}, bg={:?}->{:?})",
         text, fg, resolved_fg, bg, resolved_bg
-    );
+    ); */
 
     // Draw Background rect
     if bg != Color::Reset {

@@ -29,3 +29,11 @@ install: pre-commit
 # Show project statistics (LOC, binary sizes)
 stats:
     ../utils/kitchn/stats.sh .
+
+# Dev helper: wash plugins from .wash to .load
+dwash:
+    @./ksdev --wash
+
+# Dev helper: load plugins from .load
+dload:
+    @./ksdev --load

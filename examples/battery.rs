@@ -43,8 +43,7 @@ impl BatteryDish {
             .and_then(|s| s.trim().parse::<u8>().ok())
             .unwrap_or(0);
 
-        let status = std::fs::read_to_string(bat_path.join("status"))
-            .unwrap_or_default();
+        let status = std::fs::read_to_string(bat_path.join("status")).unwrap_or_default();
         let charging = matches!(status.trim(), "Charging" | "Full");
 
         (percent, charging)
@@ -76,29 +75,55 @@ impl Dish for BatteryDish {
         }
 
         // All colors from config - NO hardcoded values
-        let fg_color = state.config.style.fg
-            .parse::<Color>()
-            .ok();
+        let fg_color = Some(state.config.style.fg.as_str()).map(|s| {
+            let c = ColorResolver::hex_to_color(s);
+            Color::Rgb(c.r, c.g, c.b)
+        });
 
-        let bg_color = state.config.style.bg
-            .parse::<Color>()
-            .ok();
+        let bg_color = Some(state.config.style.bg.as_str()).map(|s| {
+            let c = ColorResolver::hex_to_color(s);
+            Color::Rgb(c.r, c.g, c.b)
+        });
 
-        let success_color = state.config.style.success
-            .as_deref()
-            .and_then(|c| c.parse::<Color>().ok());
+        // Check for config overrides in [dish.battery]
+        let battery_config = state.config.dish.get("battery").and_then(|v| v.as_table());
+        
+        let resolve_override = |key: &str, fallback: Option<Color>| -> Option<Color> {
+            battery_config
+                .and_then(|t| t.get(key))
+                .and_then(|v| v.as_str())
+                .map(|s| {
+                    let c = ColorResolver::hex_to_color(s);
+                    Color::Rgb(c.r, c.g, c.b)
+                })
+                .or(fallback)
+        };
 
-        let warning_color = state.config.style.secondary
-            .as_deref()
-            .and_then(|c| c.parse::<Color>().ok());
+        let success_color = resolve_override("color_high", 
+            state.config.style.success.as_deref().map(|s| {
+                let c = ColorResolver::hex_to_color(s);
+                Color::Rgb(c.r, c.g, c.b)
+            })
+        );
 
-        let error_color = state.config.style.error
-            .as_deref()
-            .and_then(|c| c.parse::<Color>().ok());
+        let warning_color = resolve_override("color_medium", 
+            state.config.style.secondary.as_deref().map(|s| {
+                let c = ColorResolver::hex_to_color(s);
+                Color::Rgb(c.r, c.g, c.b)
+            })
+        );
 
-        let accent_color = state.config.style.accent
-            .as_deref()
-            .and_then(|c| c.parse::<Color>().ok());
+        let error_color = resolve_override("color_low", 
+            state.config.style.error.as_deref().map(|s| {
+                let c = ColorResolver::hex_to_color(s);
+                Color::Rgb(c.r, c.g, c.b)
+            })
+        );
+
+        let accent_color = state.config.style.accent.as_deref().map(|s| {
+            let c = ColorResolver::hex_to_color(s);
+            Color::Rgb(c.r, c.g, c.b)
+        });
 
         // Choose bar color based on battery level - fallback chain through config colors
         let bar_color = if self.charging {
@@ -132,10 +157,14 @@ impl Dish for BatteryDish {
 
         // Icon
         for ch in icon.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
@@ -143,25 +172,35 @@ impl Dish for BatteryDish {
         if x < area.right() && !icon.is_empty() {
             let cell = &mut buf[(x, y)];
             cell.set_char(' ');
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         // Filled bar
         for ch in bar_filled.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = bar_color { cell.set_fg(c); }
+            if let Some(c) = bar_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         // Empty bar
         for ch in bar_empty.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = empty_color { cell.set_fg(c); }
+            if let Some(c) = empty_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
@@ -169,16 +208,22 @@ impl Dish for BatteryDish {
         if x < area.right() {
             let cell = &mut buf[(x, y)];
             cell.set_char(' ');
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         // Percent
         for ch in percent_str.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
     }
