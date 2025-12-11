@@ -38,7 +38,7 @@ dwash:
 dload:
     @./ksdev --load
 
-# Clean build artifacts
+# Clean build artifacts (keeps .wash sources safe)
 clean:
     cargo clean
-    rm -rf .wash .load
+    rm -rf .load
