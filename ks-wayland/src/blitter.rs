@@ -1,22 +1,21 @@
 use crate::text::TextRenderer;
+use cosmic_text::{Attrs, Buffer, Color as CosmicColor, Family, Metrics, Shaping};
 use k_lib::config::Cookbook;
 use k_lib::factory::ColorResolver;
-use ratatui::buffer::Buffer;
+use log::debug;
+use ratatui::buffer::Buffer as RatatuiBuffer;
 use ratatui::style::Color;
 
 pub fn blit_buffer_to_pixels(
-    buffer: &Buffer,
+    buffer: &RatatuiBuffer,
     pixels: &mut [u8],
     width: u32,
     height: u32,
     cookbook: &Cookbook,
-    text_renderer: &TextRenderer,
+    text_renderer: &mut TextRenderer, // Mutable for SwashCache/FontSystem
     bg_color_hex: &str,
 ) {
-    // Assumption: pixels is ARGB u32 buffer (byte array)
-
-    // 1. Fill entire background with default BG color
-    // 1. Fill entire background with default BG color
+    // 1. Fill background (same as before)
     let default_bg_color = ColorResolver::hex_to_color(bg_color_hex);
     let (bg_r, bg_g, bg_b) = (default_bg_color.r, default_bg_color.g, default_bg_color.b);
 
@@ -27,11 +26,9 @@ pub fn blit_buffer_to_pixels(
         chunk[3] = 255;
     }
 
-    // 2. Calculate offsets to center the grid
     let area = buffer.area();
     let grid_width = area.width as usize;
     let grid_height = area.height as usize;
-
     let char_w = text_renderer.char_width;
     let char_h = text_renderer.char_height;
 
@@ -42,124 +39,241 @@ pub fn blit_buffer_to_pixels(
         0
     };
 
-    // Safety check
-    let len = pixels.len();
+    let fb_width = width as usize;
+    let fb_height = height as usize;
 
-    for (i, cell) in buffer.content().iter().enumerate() {
-        let x_cell = i % grid_width;
-        let y_cell = i / grid_width;
+    // 2. Iterate by ROW to find contiguous text runs
+    for y_cell in 0..grid_height {
+        let mut current_run = String::new();
+        let mut current_fg = Color::Reset;
+        let mut current_bg = Color::Reset;
+        let mut run_start_x = 0;
 
-        let x_px_start = x_cell * char_w;
-        let y_px_start = start_y_offset + y_cell * char_h;
+        for x_cell in 0..grid_width {
+            let i = y_cell * grid_width + x_cell;
+            let cell = &buffer.content()[i];
 
-        // Skip if outside bounds
-        if x_px_start >= width as usize || y_px_start >= height as usize {
-            continue;
+            let cell_fg = cell.fg;
+            let cell_bg = cell.bg;
+            let symbol = cell.symbol();
+
+            // Check if we should break the run
+            if current_run.is_empty() {
+                current_run.push_str(symbol);
+                current_fg = cell_fg;
+                current_bg = cell_bg;
+                run_start_x = x_cell;
+            } else if cell_fg == current_fg && cell_bg == current_bg {
+                current_run.push_str(symbol);
+            } else {
+                // Style mismatch, flush current run
+                flush_run(
+                    &current_run,
+                    run_start_x,
+                    x_cell - run_start_x,
+                    y_cell,
+                    current_fg,
+                    current_bg,
+                    text_renderer,
+                    cookbook,
+                    pixels,
+                    fb_width,
+                    fb_height,
+                    start_y_offset,
+                    char_w,
+                    char_h,
+                    bg_r,
+                    bg_g,
+                    bg_b,
+                );
+
+                // Start new run
+                current_run.clear();
+                current_run.push_str(symbol);
+                current_fg = cell_fg;
+                current_bg = cell_bg;
+                run_start_x = x_cell;
+            }
         }
 
-        // Get colors
-        let bg_color = match cell.bg {
-            Color::Reset => Color::Rgb(bg_r, bg_g, bg_b), // Already filled, but needed for blending if glyph
-            c => c,
-        };
+        // Flush end of row
+        if !current_run.is_empty() {
+            flush_run(
+                &current_run,
+                run_start_x,
+                grid_width - run_start_x,
+                y_cell,
+                current_fg,
+                current_bg,
+                text_renderer,
+                cookbook,
+                pixels,
+                fb_width,
+                fb_height,
+                start_y_offset,
+                char_w,
+                char_h,
+                bg_r,
+                bg_g,
+                bg_b,
+            );
+        }
+    }
+}
 
-        let fg_color = match cell.fg {
-            Color::Reset => cookbook
-                .theme
-                .colors
-                .get("fg")
-                .map(|s| {
-                    let cc = ColorResolver::hex_to_color(s);
-                    Color::Rgb(cc.r, cc.g, cc.b)
-                })
-                .unwrap_or(Color::White),
-            c => c,
-        };
+#[allow(clippy::too_many_arguments)]
+fn flush_run(
+    text: &str,
+    start_x_cell: usize,
+    width_in_cells: usize,
+    y_cell: usize,
+    fg: Color,
+    bg: Color,
+    text_renderer: &mut TextRenderer,
+    cookbook: &Cookbook,
+    pixels: &mut [u8],
+    width: usize,
+    height: usize,
+    start_y_offset: usize,
+    char_w: usize,
+    char_h: usize,
+    _default_bg_r: u8,
+    _default_bg_g: u8,
+    _default_bg_b: u8,
+) {
+    let resolved_fg = resolve_color(fg, cookbook, Color::White);
+    let resolved_bg = resolve_color(bg, cookbook, Color::Reset); // Reset means transparent/default
 
-        // Rasterize Glyph
-        let symbol = cell.symbol();
-        let c = symbol.chars().next().unwrap_or(' ');
+    debug!(
+        "Flush run: '{}' (fg={:?}->{:?}, bg={:?}->{:?})",
+        text, fg, resolved_fg, bg, resolved_bg
+    );
 
-        let raster_result = text_renderer.rasterize(c, 16.0);
+    // Draw Background rect
+    if bg != Color::Reset {
+        let (br, bg, bb) = color_to_rgb(resolved_bg);
+        // Correctly use the passed width in cells
+        let run_width_cells = width_in_cells;
 
-        // Check if we need to draw background
-        if cell.bg != Color::Reset {
-            let (cell_bg_r, cell_bg_g, cell_bg_b) = color_to_rgb(bg_color);
-            for y in 0..char_h {
-                for x in 0..char_w {
-                    let px_x = x_px_start + x;
-                    let px_y = y_px_start + y;
+        let rect_x = start_x_cell * char_w;
+        let rect_y = start_y_offset + y_cell * char_h;
+        let rect_w = run_width_cells * char_w;
+        let rect_h = char_h;
 
-                    if px_x >= width as usize || px_y >= height as usize {
-                        continue;
-                    }
+        for y in 0..rect_h {
+            for x in 0..rect_w {
+                let px_x = rect_x + x;
+                let px_y = rect_y + y;
+                if px_x >= width || px_y >= height {
+                    continue;
+                }
 
-                    let offset = (px_y * width as usize + px_x) * 4;
-                    if offset + 4 > len {
-                        continue;
-                    }
-
-                    pixels[offset] = cell_bg_b;
-                    pixels[offset + 1] = cell_bg_g;
-                    pixels[offset + 2] = cell_bg_r;
+                let offset = (px_y * width + px_x) * 4;
+                if offset + 4 <= pixels.len() {
+                    pixels[offset] = bb;
+                    pixels[offset + 1] = bg;
+                    pixels[offset + 2] = br;
                     pixels[offset + 3] = 255;
                 }
             }
         }
+    }
 
-        // Draw Glyph on top (Blending)
-        if let Some((metrics, bitmap)) = &raster_result
-            && !bitmap.is_empty()
-        {
-            let (fg_r, fg_g, fg_b) = color_to_rgb(fg_color);
+    // Draw Text with Cosmic Text
+    let font_size = 16.0; // Should match TextRenderer init
+    let line_height = font_size * 1.2;
 
-            for y in 0..char_h {
-                for x in 0..char_w {
-                    let px_x = x_px_start + x;
-                    let px_y = y_px_start + y;
+    // debug!("Flush run: '{}' (bg={:?}) Cells: {} ", text, bg, width_in_cells);
 
-                    if px_x >= width as usize || px_y >= height as usize {
+    let mut buffer = Buffer::new(
+        &mut text_renderer.font_system,
+        Metrics::new(font_size, line_height),
+    );
+
+    // Shape text
+    buffer.set_text(
+        &mut text_renderer.font_system,
+        text,
+        Attrs::new().family(Family::Name(&text_renderer.font_family)),
+        Shaping::Advanced,
+    );
+    buffer.shape_until_scroll(&mut text_renderer.font_system, false);
+
+    // Rasterize
+    let (fr, fg, fb) = color_to_rgb(resolved_fg);
+    let cosmic_color = CosmicColor::rgb(fr, fg, fb);
+
+    // Run callback
+    let draw_x_base = (start_x_cell * char_w) as i32;
+    let draw_y_base = (start_y_offset + y_cell * char_h) as i32;
+    #[allow(clippy::unnecessary_cast)]
+    let stride = width as usize;
+    let width_i32 = width as i32;
+    let height_i32 = height as i32;
+
+    buffer.draw(
+        &mut text_renderer.font_system,
+        &mut text_renderer.swash_cache,
+        cosmic_color,
+        |x, y, w, h, color| {
+            for dy in 0..h {
+                for dx in 0..w {
+                    let px_x = draw_x_base + x + dx as i32;
+                    let px_y = draw_y_base + y + dy as i32;
+
+                    if px_x < 0 || px_x >= width_i32 || px_y < 0 || px_y >= height_i32 {
                         continue;
                     }
 
-                    // Map x/y to bitmap coords
-                    let g_x = x as i32;
-                    let g_y = y as i32 - (char_h as i32 - metrics.height as i32) / 2;
+                    let offset = (px_y as usize * stride + px_x as usize) * 4;
+                    if offset + 4 > pixels.len() {
+                        continue;
+                    }
 
-                    if g_x >= 0
-                        && g_x < metrics.width as i32
-                        && g_y >= 0
-                        && g_y < metrics.height as i32
-                    {
-                        let b_idx = (g_y * metrics.width as i32 + g_x) as usize;
-                        if b_idx < bitmap.len() {
-                            let alpha = bitmap[b_idx];
-                            if alpha > 0 {
-                                let offset = (px_y * width as usize + px_x) * 4;
-                                if offset + 4 <= len {
-                                    // Read current background (either Fill or CellBG)
-                                    let base_b = pixels[offset];
-                                    let base_g = pixels[offset + 1];
-                                    let base_r = pixels[offset + 2];
+                    let alpha = color.a();
+                    if alpha > 0 {
+                        let bg_b = pixels[offset];
+                        let bg_g = pixels[offset + 1];
+                        let bg_r = pixels[offset + 2];
 
-                                    let a_f = alpha as f32 / 255.0;
-                                    let inv_a = 1.0 - a_f;
+                        let a_f = alpha as f32 / 255.0;
+                        let inv_a = 1.0 - a_f;
 
-                                    let r = (fg_r as f32 * a_f + base_r as f32 * inv_a) as u8;
-                                    let g = (fg_g as f32 * a_f + base_g as f32 * inv_a) as u8;
-                                    let b = (fg_b as f32 * a_f + base_b as f32 * inv_a) as u8;
+                        let r = (color.r() as f32 * a_f + bg_r as f32 * inv_a) as u8;
+                        let g = (color.g() as f32 * a_f + bg_g as f32 * inv_a) as u8;
+                        let b = (color.b() as f32 * a_f + bg_b as f32 * inv_a) as u8;
 
-                                    pixels[offset] = b;
-                                    pixels[offset + 1] = g;
-                                    pixels[offset + 2] = r;
-                                    pixels[offset + 3] = 255;
-                                }
-                            }
-                        }
+                        pixels[offset] = b;
+                        pixels[offset + 1] = g;
+                        pixels[offset + 2] = r;
+                        pixels[offset + 3] = 255;
                     }
                 }
             }
+        },
+    );
+}
+
+// Helpers
+fn resolve_color(c: Color, cookbook: &Cookbook, default: Color) -> Color {
+    match c {
+        Color::Reset => {
+            if default == Color::White {
+                // Try looking up 'fg' from theme
+                cookbook
+                    .theme
+                    .colors
+                    .get("fg")
+                    .map(|s| {
+                        let cc = ColorResolver::hex_to_color(s);
+                        Color::Rgb(cc.r, cc.g, cc.b)
+                    })
+                    .unwrap_or(Color::White)
+            } else {
+                default
+            }
         }
+        c => c,
     }
 }
 
@@ -182,7 +296,7 @@ fn color_to_rgb(color: Color) -> (u8, u8, u8) {
         Color::LightCyan => (128, 255, 255),
         Color::White => (255, 255, 255),
         Color::Rgb(r, g, b) => (r, g, b),
-        Color::Indexed(i) => (i, i, i), // TODO: Palette lookup
+        Color::Indexed(i) => (i, i, i),
         Color::Reset => (0, 0, 0),
     }
 }

@@ -11,5 +11,5 @@ log = { workspace = true }
 anyhow = { workspace = true }
 thiserror = "2.0"
 k-lib = { workspace = true }
-fontdue = "0.9.3"
+cosmic-text = "0.12.1"
 tracing = { workspace = true }

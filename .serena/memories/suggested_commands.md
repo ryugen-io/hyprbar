@@ -5,7 +5,8 @@
 - `cargo run`: Run locally (might fail if Wayland socket not present, use in Sway/Hyprland).
 
 ## Install
-- `cargo install --path .`: Install locally.
+- `just install`: Full install (fmt, check, build, install, pre-commit).
+- `cargo install --path .`: Manual install.
 - `kitchn cook`: Update configuration (sink.toml) from Kitchn theme.
 
 ## Utils

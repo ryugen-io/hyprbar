@@ -8,10 +8,19 @@ pub struct SinkConfig {
     pub style: StyleConfig,
     #[serde(default)]
     pub layout: LayoutConfig,
+    #[serde(default)]
+    pub dish: std::collections::HashMap<String, toml::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LayoutConfig {
+    #[serde(default)]
+    pub modules_left: Vec<String>,
+    #[serde(default)]
+    pub modules_center: Vec<String>,
+    #[serde(default)]
+    pub modules_right: Vec<String>,
+
     #[serde(default = "default_layout_percent")]
     pub left: u8,
     #[serde(default = "default_layout_percent")]
@@ -26,6 +35,9 @@ impl Default for LayoutConfig {
             left: 33,
             center: 33,
             right: 33,
+            modules_left: vec![],
+            modules_center: vec![],
+            modules_right: vec![],
         }
     }
 }

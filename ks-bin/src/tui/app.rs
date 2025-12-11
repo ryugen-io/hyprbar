@@ -132,7 +132,7 @@ impl App {
                                 .iter()
                                 .any(|arg| arg == "manage" || arg == "m")
                         {
-                            process.kill();
+                            process.kill_with(sysinfo::Signal::Term);
                         }
                     }
                 } else {

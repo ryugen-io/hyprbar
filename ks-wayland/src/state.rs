@@ -76,7 +76,7 @@ impl WaylandState {
             width,
             height,
             cookbook,
-            &self.text_renderer,
+            &mut self.text_renderer,
             bg_color_hex,
         );
 

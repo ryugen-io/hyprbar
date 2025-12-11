@@ -1,9 +1,11 @@
+use crate::config::SinkConfig;
+use crate::dish::Dish;
 use crate::state::BarState;
 use anyhow::Result;
-use k_lib::factory::ColorResolver;
+use k_lib::config::Cookbook;
 use log::debug;
 use ratatui::prelude::*;
-use ratatui::widgets::{Paragraph, Widget};
+
 use std::time::Duration;
 use tachyonfx::{Effect, Interpolation, fx};
 
@@ -12,26 +14,71 @@ pub struct BarRenderer {
     effects: Vec<Effect>,
     pub width: u16,
     pub height: u16,
+    left_dishes: Vec<Box<dyn Dish>>,
+    center_dishes: Vec<Box<dyn Dish>>,
+    right_dishes: Vec<Box<dyn Dish>>,
 }
 
 impl BarRenderer {
-    pub fn new(width: u16, height: u16) -> Self {
+    pub fn new(
+        width: u16,
+        height: u16,
+        config: &SinkConfig,
+        cookbook: &Cookbook,
+        provider: &dyn crate::dish::DishProvider,
+    ) -> Self {
         debug!("Initializing BarRenderer with size {}x{}", width, height);
         let area = Rect::new(0, 0, width, height);
-        // Example startup effect
-        // Example startup effect: Fade from Cyan (FG & BG) to default
+
         let effects = vec![fx::fade_from(
             Color::Cyan,
             Color::Cyan,
             (800, Interpolation::SineInOut),
         )];
 
+        let left_dishes =
+            Self::init_dishes(&config.layout.modules_left, config, cookbook, provider);
+        let center_dishes =
+            Self::init_dishes(&config.layout.modules_center, config, cookbook, provider);
+        let right_dishes =
+            Self::init_dishes(&config.layout.modules_right, config, cookbook, provider);
+
         Self {
             buffer: Buffer::empty(area),
             effects,
             width,
             height,
+            left_dishes,
+            center_dishes,
+            right_dishes,
         }
+    }
+
+    fn init_dishes(
+        names: &[String],
+        _config: &SinkConfig,
+        cookbook: &Cookbook,
+        provider: &dyn crate::dish::DishProvider,
+    ) -> Vec<Box<dyn Dish>> {
+        let mut dishes: Vec<Box<dyn Dish>> = Vec::new();
+        // Preset is a struct, use .msg for the format string
+        let log_fmt = cookbook
+            .dictionary
+            .presets
+            .get("dish_loaded")
+            .map(|p| p.msg.clone())
+            .unwrap_or_else(|| "Loaded Dish: {0} (Type: {1})".to_string());
+
+        for name in names {
+            if let Some(plugin_dish) = provider.create_dish(name) {
+                let msg = log_fmt.replace("{0}", name).replace("{1}", "Plugin");
+                log::info!("{}", msg);
+                dishes.push(plugin_dish);
+            } else {
+                debug!("Unknown dish: {}", name);
+            }
+        }
+        dishes
     }
 
     pub fn resize(&mut self, width: u16, height: u16) {
@@ -45,60 +92,56 @@ impl BarRenderer {
     }
 
     pub fn render_frame(&mut self, state: &BarState, dt: Duration) -> Result<()> {
-        let area = Rect::new(0, 0, self.width, self.height);
+        // Update all dishes first
+        for dish in self.left_dishes.iter_mut() {
+            dish.update(dt);
+        }
+        for dish in self.center_dishes.iter_mut() {
+            dish.update(dt);
+        }
+        for dish in self.right_dishes.iter_mut() {
+            dish.update(dt);
+        }
 
-        // Reset buffer
+        let area = Rect::new(0, 0, self.width, self.height);
         self.buffer.reset();
 
-        // Build widgets based on state
-        // Build widgets based on state
-        // Decoupled from Cookbook (use Config)
-        let bg_color_hex = &state.config.style.bg;
-        let fg_color_hex = &state.config.style.fg;
-
-        let bg_custom = ColorResolver::hex_to_color(bg_color_hex);
-        let fg_custom = ColorResolver::hex_to_color(fg_color_hex);
-
-        let bg = Color::Rgb(bg_custom.r, bg_custom.g, bg_custom.b);
-        let fg = Color::Rgb(fg_custom.r, fg_custom.g, fg_custom.b);
-
-        let text = format!(
-            " kitchnsink | CPU: {:.1}% | MEM: {:.1}% | {} ",
-            state.cpu, state.mem, state.time
-        );
-
-        // Logical Layout
+        // Layout Chunks
         let layout_constraints = [
             Constraint::Percentage(state.config.layout.left as u16),
             Constraint::Percentage(state.config.layout.center as u16),
             Constraint::Percentage(state.config.layout.right as u16),
         ];
 
-        let _chunks = Layout::default()
+        let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(layout_constraints)
             .split(area);
 
-        // For now, render the bar text into the center chunk, or full area?
-        // Prompt asks for "logical background" setup.
-        // We'll keep the full bar render for visual stability, but log the chunks or prepare them.
-        // Let's render the text centered in the whole bar for now to avoid breaking existing visual.
-        // The chunks are available for "Task 2".
-
-        /*
-        // Example usage for later:
-        let left_chunk = chunks[0];
-        let center_chunk = chunks[1];
-        let right_chunk = chunks[2];
-        */
-
-        // Create the paragraph as before
-        let bar = Paragraph::new(text)
-            .style(Style::default().fg(fg).bg(bg))
-            .alignment(Alignment::Center);
-
-        // Render to the full area for now to maintain current look
-        bar.render(area, &mut self.buffer);
+        // Render Left
+        Self::render_section(
+            &mut self.buffer,
+            chunks[0],
+            &self.left_dishes,
+            state,
+            Alignment::Left,
+        );
+        // Render Center
+        Self::render_section(
+            &mut self.buffer,
+            chunks[1],
+            &self.center_dishes,
+            state,
+            Alignment::Center,
+        );
+        // Render Right
+        Self::render_section(
+            &mut self.buffer,
+            chunks[2],
+            &self.right_dishes,
+            state,
+            Alignment::Right,
+        );
 
         // Apply effects
         self.effects.retain_mut(|effect| {
@@ -107,6 +150,41 @@ impl BarRenderer {
         });
 
         Ok(())
+    }
+
+    fn render_section(
+        buffer: &mut Buffer,
+        area: Rect,
+        dishes: &[Box<dyn Dish>],
+        state: &BarState,
+        align: Alignment,
+    ) {
+        if dishes.is_empty() {
+            return;
+        }
+
+        let dish_widths: Vec<u16> = dishes.iter().map(|d| d.width(state)).collect();
+        let total_width: u16 = dish_widths.iter().sum();
+
+        // If content is wider than chunk, it will clip.
+        // If smaller, alignment matters.
+
+        let mut current_x = match align {
+            Alignment::Left => area.x,
+            Alignment::Center => area.x + (area.width.saturating_sub(total_width)) / 2,
+            Alignment::Right => area.x + area.width.saturating_sub(total_width),
+        };
+
+        for (i, dish) in dishes.iter().enumerate() {
+            let w = dish_widths[i];
+            let render_area = Rect::new(current_x, area.y, w, area.height);
+            // Ensure we don't draw outside chunk
+            let intersection = render_area.intersection(area);
+            if !intersection.is_empty() {
+                dish.render(intersection, buffer, state);
+            }
+            current_x += w;
+        }
     }
 
     pub fn buffer(&self) -> &Buffer {

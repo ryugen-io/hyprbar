@@ -5,3 +5,10 @@ Cargo.lock
 # In-Memoria
 
 in-memoria.db
+
+# Logs
+*.log
+
+# Artifacts
+*.dish
+*.so

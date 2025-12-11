@@ -23,5 +23,9 @@ pre-commit: fmt check
     git add .
 
 # Install the binary
-install:
+install: pre-commit
     cargo install --path ks-bin --force
+
+# Show project statistics (LOC, binary sizes)
+stats:
+    ../utils/kitchn/stats.sh .

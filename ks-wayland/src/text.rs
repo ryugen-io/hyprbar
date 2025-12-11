@@ -1,100 +1,111 @@
-use anyhow::{Context, Result};
-use fontdue::{Font, FontSettings};
+use anyhow::Result;
+use cosmic_text::fontdb::{Database, Source};
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache};
 use log::{debug, warn};
-use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 pub struct TextRenderer {
-    font: Font,
+    pub font_system: FontSystem,
+    pub swash_cache: SwashCache,
     pub char_width: usize,
     pub char_height: usize,
+    pub font_family: String,
 }
 
 impl TextRenderer {
     pub fn new(font_path: Option<&str>) -> Result<Self> {
-        // Default fonts to try if none specified
-        let default_fonts = [
-            "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-            "/usr/share/fonts/liberation/LiberationMono-Regular.ttf",
-            "/usr/share/fonts/TTF/LiberationMono-Regular.ttf",
-        ];
+        let swash_cache = SwashCache::new();
 
-        let font_data = if let Some(path_str) = font_path {
-            debug!("Loading user font: {}", path_str);
+        // Store the requested family name (or default to "Monospace")
+        let font_family = font_path.unwrap_or("Monospace").to_string();
 
-            // Try direct path first
-            let mut path = std::path::PathBuf::from(path_str);
-            if !path.exists() {
-                // Try resolving via fc-match
-                if let Some(resolved) = resolve_font_via_fc_match(path_str) {
-                    debug!("Resolved '{}' to '{}'", path_str, resolved);
-                    path = std::path::PathBuf::from(resolved);
-                }
-            }
-
-            match fs::read(&path) {
-                Ok(data) => Some(data),
-                Err(e) => {
-                    warn!(
-                        "Failed to read user font '{}' (checked path: {:?}): {}. Falling back to system defaults.",
-                        path_str, path, e
-                    );
-                    None
-                }
+        // 1. Determine which font to load
+        let font_to_load = if let Some(path_str) = font_path {
+            debug!("Requesting user font: {}", path_str);
+            let path = PathBuf::from(path_str);
+            if path.exists() {
+                Some(path)
+            } else if let Some(resolved) = resolve_font_via_fc_match(path_str) {
+                debug!("Resolved '{}' to '{}'", path_str, resolved);
+                Some(PathBuf::from(resolved))
+            } else {
+                warn!(
+                    "Could not find font '{}', falling back to defaults.",
+                    path_str
+                );
+                None
             }
         } else {
             None
         };
 
-        let font_data = if let Some(data) = font_data {
-            data
-        } else {
-            // Try defaults
-            let mut data = None;
-            for path in default_fonts {
-                if Path::new(path).exists() {
-                    debug!("Loading default font: {}", path);
-                    if let Ok(d) = fs::read(path) {
-                        data = Some(d);
-                        break;
-                    }
-                }
-            }
+        // 2. Initialize FontSystem with EMPTY database to avoid scanning system fonts (slow!)
+        let mut db = Database::new();
 
-            data.ok_or_else(|| {
-                anyhow::anyhow!("No default font found. Please configure a font in sink.toml")
-            })?
+        // Load the specific font file if found
+        if let Some(path) = font_to_load {
+            if let Ok(data) = std::fs::read(&path) {
+                db.load_font_source(Source::Binary(std::sync::Arc::new(data)));
+                debug!("Loaded font file: {:?}", path);
+            } else {
+                warn!("Failed to read font file: {:?}", path);
+            }
+        } else {
+            warn!("No specific font loaded. Text might not render.");
+        }
+
+        let mut font_system = FontSystem::new_with_locale_and_db("en-US".into(), db);
+
+        // 3. Setup Metrics (Fixed Grid)
+        let font_size = 16.0;
+        let line_height = font_size * 1.2;
+
+        // Create a dummy buffer to measure 'M' width for grid size
+        let mut buffer = Buffer::new(&mut font_system, Metrics::new(font_size, line_height));
+
+        // We set a default family to ensure we measure something reasonable.
+        // Even if we loaded a custom font, we usually need to specify it by name
+        // We use the requested family name here.
+        buffer.set_text(
+            &mut font_system,
+            "M",
+            Attrs::new().family(Family::Name(&font_family)),
+            Shaping::Advanced,
+        );
+        buffer.shape_until_scroll(&mut font_system, false);
+
+        let iter = buffer.layout_runs().next();
+        let char_width = if let Some(run) = iter {
+            run.line_w.ceil() as usize
+        } else {
+            (font_size * 0.6) as usize // Fallback
         };
 
-        let font = Font::from_bytes(font_data, FontSettings::default())
-            .map_err(|msg| anyhow::anyhow!("{}", msg))
-            .context("Failed to parse font")?;
+        // Ensure at least 1px
+        let char_width = char_width.max(1);
+        let char_height = line_height.ceil() as usize;
 
-        // Calculate metrics for a standard character (e.g., 'A') at fixed size
-        // We assume a fixed grid for now (Mono)
-        let size = 16.0; // Px
-        let metrics = font.metrics('M', size);
+        debug!(
+            "TextRenderer initialized. Grid: {}x{}",
+            char_width, char_height
+        );
 
-        // We enforce a fixed cell size for the TUI grid.
-        // For a monospace font, width should be consistent.
-        // Height we can pick based on line height.
-        let char_width = metrics.width.max(1) as usize; // Simplified
-        let char_height = (size * 1.2) as usize; // Line height
+        // Debug loaded faces
+        for face in font_system.db().faces() {
+            debug!(
+                "Loaded face: {:?} (Families: {:?})",
+                face.post_script_name, face.families
+            );
+        }
 
         Ok(Self {
-            font,
+            font_system,
+            swash_cache,
             char_width,
             char_height,
+            font_family,
         })
-    }
-
-    pub fn rasterize(&self, c: char, size: f32) -> Option<(fontdue::Metrics, Vec<u8>)> {
-        if c == ' ' {
-            return None;
-        }
-        Some(self.font.rasterize(c, size))
     }
 }
 
