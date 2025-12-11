@@ -164,24 +164,28 @@ pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
         label: "My Dish".to_string(),
     })
 }
-    })
 }
 ```
 
 ## 6. Supporting Multiple Instances (Optional)
 
-If you want users to be able to use your Dish multiple times with different configurations (e.g. `[dish.Clock1]` and `[dish.Clock2]`), you can implement the `set_instance_config` method.
+If you want users to be able to use your Dish multiple times with different configurations (e.g. `[dish.Clock.Work]` and `[dish.Clock.Home]`), you can implement the `set_instance_config` method.
 
 In `sink.toml`, users can then write:
 ```toml
 # Layout
-modules_right = ["MyDish#Instance1", "MyDish#Instance2"]
+modules_right = ["MyDish#Work", "MyDish#Home"]
 
-[dish.Instance1]
-header = "WORK"
+# Base Config (Applied to all)
+[dish.MyDish]
+header = "DEFAULT"
 
-[dish.Instance2]
-header = "HOME"
+  # Instance Overrides (Nested Table)
+  [dish.MyDish.Work]
+  header = "OFFICE"
+
+  [dish.MyDish.Home]
+  header = "RELAX"
 ```
 
 In your code:
@@ -189,13 +193,26 @@ In your code:
 impl Dish for MyDish {
     // ...
     fn set_instance_config(&mut self, name: String) {
-        // Store the alias (e.g. "Instance1") to look up config later
-        self.config_key = name; 
+        // Store the alias (e.g. "Work") to look up config later
+        self.instance_name = Some(name); 
     }
     
     fn render(...) {
-        // Use self.config_key instead of "MyDish"
-        let header = state.config.dish.get(&self.config_key)...
+        // 1. Get Base Config
+        let base = state.config.dish.get("MyDish").and_then(|v| v.as_table());
+        
+        // 2. Get Instance Config (nested inside base)
+        let instance = if let Some(alias) = &self.instance_name {
+            base.and_then(|t| t.get(alias)).and_then(|v| v.as_table())
+        } else {
+            None
+        };
+
+        // 3. Resolve value (Instance > Base > Default)
+        let header = instance.and_then(|t| t.get("header"))
+            .or_else(|| base.and_then(|t| t.get("header")))
+            .and_then(|v| v.as_str())
+            .unwrap_or("DEFAULT");
     }
 }
 ```

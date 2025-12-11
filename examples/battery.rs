@@ -10,6 +10,7 @@ pub struct BatteryDish {
     charging: bool,
     last_update: Duration,
     battery_path: Option<std::path::PathBuf>,
+    instance_name: Option<String>,
 }
 
 impl BatteryDish {
@@ -21,43 +22,18 @@ impl BatteryDish {
             charging,
             last_update: Duration::ZERO,
             battery_path,
+            instance_name: None,
         }
     }
-
-    fn find_battery() -> Option<std::path::PathBuf> {
-        let power_supply = std::path::Path::new("/sys/class/power_supply");
-        if let Ok(entries) = std::fs::read_dir(power_supply) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                if name_str.starts_with("BAT") {
-                    return Some(entry.path());
-                }
-            }
-        }
-        None
-    }
-
-    fn read_battery(path: &Option<std::path::PathBuf>) -> (u8, bool) {
-        let Some(bat_path) = path else {
-            return (0, false);
-        };
-
-        let percent = std::fs::read_to_string(bat_path.join("capacity"))
-            .ok()
-            .and_then(|s| s.trim().parse::<u8>().ok())
-            .unwrap_or(0);
-
-        let status = std::fs::read_to_string(bat_path.join("status")).unwrap_or_default();
-        let charging = matches!(status.trim(), "Charging" | "Full");
-
-        (percent, charging)
-    }
-}
+// ... (keep find_battery and read_battery)
 
 impl Dish for BatteryDish {
     fn name(&self) -> &str {
         "Battery"
+    }
+
+    fn set_instance_config(&mut self, name: String) {
+        self.instance_name = Some(name);
     }
 
     fn width(&self, _state: &BarState) -> u16 {
@@ -91,12 +67,21 @@ impl Dish for BatteryDish {
             Color::Rgb(c.r, c.g, c.b)
         });
 
-        // Check for config overrides in [dish.battery]
-        let battery_config = state.config.dish.get("battery").and_then(|v| v.as_table());
+        // Config Lookup Strategy directly matching user request:
+        // 1. Base Config: [dish.Battery]
+        // 2. Instance Override: [dish.Battery.Mouse]
+        let base_config = state.config.dish.get("Battery").and_then(|v| v.as_table());
+        
+        let instance_config = if let Some(alias) = &self.instance_name {
+            base_config.and_then(|t| t.get(alias)).and_then(|v| v.as_table())
+        } else {
+            None
+        };
 
         let resolve_override = |key: &str, fallback: Option<Color>| -> Option<Color> {
-            battery_config
-                .and_then(|t| t.get(key))
+             // Try instance config first, then base config
+             instance_config.and_then(|t| t.get(key))
+                .or_else(|| base_config.and_then(|t| t.get(key)))
                 .and_then(|v| v.as_str())
                 .map(|s| {
                     let c = ColorResolver::hex_to_color(s);
