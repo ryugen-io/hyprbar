@@ -78,6 +78,7 @@ impl Dish for BatteryDish {
         if area.width == 0 || area.height == 0 {
             return;
         }
+        let _ = state.cookbook.help_me_find_icons;
 
         // All colors from config - NO hardcoded values
         let fg_color = Some(state.config.style.fg.as_str()).map(|s| {

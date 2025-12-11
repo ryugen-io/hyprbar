@@ -1,18 +1,23 @@
 # Comprehensive Guide to Creating Kitchnsink Dishes 🍽️
 
-This guide covers everything you need to create powerful, dynamic, and theme-aware plugins (Dishes) for `kitchnsink`.
+This guide will walk you through the process of creating a powerful, dynamic plugin (Dish) for `kitchnsink`. Let's build an "Advanced Dish" together, exploring how to access system state, handle configuration, and render beautiful UI along the way.
 
-## 1. Anatomy of a Dish
+## 1. Setting up the Environment
 
-A Dish is a dynamic library (`.dish`) compiled from a single Rust source file. It must implement the `Dish` trait and export a creator function.
+To get started, we need to prepare our workspace. A Dish is simply a single Rust source file that `kitchnsink` compiles into a dynamic library.
 
-### Required Imports
+Create a new file named `advanced_dish.rs` and bring the necessary tools into scope:
+
 ```rust
 use ks_core::prelude::*; // Provides Dish, BarState, ratatui types, etc.
 ```
 
-### The Recipe (Metadata)
-Every dish **must** start with these comments to be recognized:
+## 2. Defining Metadata
+
+Now, we need to ensure the system recognizes your creation. Every dish **must** begin with a specific set of metadata comments.
+
+Add the following block to the top of your file to identify your plugin:
+
 ```rust
 //! Name: Advanced Dish
 //! Version: 1.0.0
@@ -20,152 +25,72 @@ Every dish **must** start with these comments to be recognized:
 //! Description: Demonstrating all features
 ```
 
-### The Structure
-Your dish struct holds its own state. It must be `Send + Sync`.
+## 3. Creating the State Struct
+
+With the setup complete, it's time to define your dish's memory. The struct you create here will hold the state that needs to persist between frames, and it must be thread-safe (`Send + Sync`).
+
+For this walkthrough, let's track a simple counter and cache a configuration string:
+
 ```rust
 struct MyDish {
-    // Internal state
+    // Internal state to track time and updates
     counter: usize,
     last_update: Duration,
-    // Configuration cache
+    // Configuration cache to avoid looking up config every frame
     label: String,
 }
 ```
 
-## 2. Implementing the Dish Trait
+## 4. Implementing the Dish Trait
 
-### `name(&self)`
-Returns the unique identifier for your dish. This is used for logging and debugging.
-```rust
-fn name(&self) -> &str { "MyAdvancedDish" }
-```
+This is where the magic happens. Implementing the `Dish` trait provides the core interface that `kitchnsink` uses to interact with your plugin.
 
-### `width(&self, state: &BarState)`
-Calculates how much horizontal space (in cells) your dish needs.
-*   You can access `state` to make this dynamic (e.g., if you show more text when CPU is high).
-```rust
-fn width(&self, _state: &BarState) -> u16 {
-    // 10 chars for label + 4 for counter
-    14 
-}
-```
+### Naming and Sizing
 
-### `update(&mut self, dt: Duration)`
-Called every frame tick (usually 60Hz). Use this for:
-*   Animation timing
-*   Polling external resources (carefully!)
-*   Updating internal counters
-**⚠️ Warning**: This runs on the main thread. Do **not** perform blocking I/O (like large file reads or network requests) here. Use `std::thread::spawn` or similar if you need to fetch data, and update your state via shared memory (Mutex/Atomic).
+First, let's identify the dish and tell the bar how much screen real estate we require.
+
 ```rust
-fn update(&mut self, dt: Duration) {
-    self.last_update += dt;
-    if self.last_update.as_secs() >= 1 {
-        self.counter += 1;
-        self.last_update = Duration::ZERO;
+impl Dish for MyDish {
+    fn name(&self) -> &str { "MyAdvancedDish" }
+
+    fn width(&self, _state: &BarState) -> u16 {
+        // We can calculate width dynamically here.
+        // We'll reserve 14 cells: 10 for the label + 4 for the counter.
+        14 
     }
-}
 ```
 
-### `render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, dt: Duration)`
-The core visual logic. Draws your widget using `ratatui`.
-*   `area`: The specific rectangle allocated to your dish.
-*   `buf`: The target buffer to write to.
-*   `state`: Global system state (CPU, Mem, Config).
-*   `dt`: Time delta since last frame (for smooth animations).
+### Handling Updates
 
-## 3. Accessing "All Features" via `BarState`
+Moving on to the heartbeat of your plugin: the update loop. This method fires every frame (tick), giving you the perfect place to handle animation timing or internal logic.
 
-The `state` parameter in `render` and `width` is your gateway to the system.
-
-### System Stats
-```rust
-let cpu_usage = state.cpu; // f32 (0.0 - 100.0)
-let ram_usage = state.mem; // f32 (0.0 - 100.0)
-let time_str = &state.time; // Current time string
-```
-
-### Configuration (`state.config`)
-Access `kitchnsink` specific settings (`sink.toml`).
-```rust
-// Access global style colors
-let fg = state.config.style.fg; 
-let bg = state.config.style.bg;
-// Access success/error/warning colors
-let ok_color = state.config.style.success.as_deref().unwrap_or("#00ff00");
-```
-
-### Global Kitchen Context (`state.cookbook`)
-Access the wider `kitchn` ecosystem configuration (`layout.toml`, `theme.toml`).
-```rust
-// Access the active theme's detailed palette
-let special_color = state.cookbook.theme.colors.get("purple").map(|s| s.as_str());
-
-// Access icons based on active set (nerdfont/ascii)
-let icon = if state.cookbook.theme.settings.active_icons == "nerdfont" {
-    "⚡" 
-} else {
-    "P"
-};
-```
-
-### Custom Dish Configuration
-Users can configure your dish in `sink.toml`:
-```toml
-[dish.my_dish]
-label = "CPU Core 1"
-alert_threshold = 80
-```
-
-Access this in your code:
-```rust
-// In render or query methods
-if let Some(config_table) = state.config.dish.get("my_dish").and_then(|v| v.as_table()) {
-    if let Some(val) = config_table.get("alert_threshold").and_then(|v| v.as_integer()) {
-        // Use custom threshold...
-    }
-}
-```
-
-## 4. Logging
-You can use standard logging macros. These are captured by `kitchnsink` and written to the system log file.
-```rust
-log::info!("My dish initialized!");
-log::warn!("Something strange happened");
-```
-
-## 5. Full Example: "PowerUser" Dish
+**Note:** This runs on the main thread, so keep it lightweight—avoid blocking operations like network requests here.
 
 ```rust
-//! Name: PowerUser
-//! Version: 1.0.0
-//! Author: Kitchn Master
-//! Description: Advanced system monitor with theming and config
-
-use ks_core::prelude::*;
-
-struct PowerDish {
-    last_tick: Duration,
-    show_details: bool,
-}
-
-impl Dish for PowerDish {
-    fn name(&self) -> &str { "PowerUser" }
-
-    fn width(&self, state: &BarState) -> u16 {
-        if self.show_details { 20 } else { 10 }
-    }
-
     fn update(&mut self, dt: Duration) {
-        self.last_tick += dt;
-        // Toggle view every 5 seconds
-        if self.last_tick.as_secs() >= 5 {
-            self.show_details = !self.show_details;
-            self.last_tick = Duration::ZERO;
+        self.last_update += dt;
+        
+        // Let's maximize the excitement by updating the counter once every second
+        if self.last_update.as_secs() >= 1 {
+            self.counter += 1;
+            self.last_update = Duration::ZERO;
         }
     }
+```
 
+### Rendering the UI
+
+Now for the visual payoff. The `render` method hands you a `ratatui` buffer, which is your canvas for drawing.
+
+You have access to the global `state` object, which is your window into the rest of the system:
+- `state.cpu`, `state.mem`: Real-time system stats
+- `state.config`: `kitchnsink` specific settings
+- `state.cookbook`: Global `kitchn` ecosystem settings (themes, icons)
+
+```rust
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
         // 1. Resolve Colors from Theme
+        // Let's grab the color palette from the global configuration
         let fg_hex = &state.config.style.fg;
         let bg_hex = &state.config.style.bg;
         let accent_hex = state.config.style.accent.as_deref().unwrap_or("#ff00ff");
@@ -174,40 +99,74 @@ impl Dish for PowerDish {
         let accent = ColorResolver::hex_to_color(accent_hex);
 
         // 2. Custom Config Check
-        let header = state.config.dish.get("power_user")
+        // We can also check if the user has customized our header in sink.toml
+        let header = state.config.dish.get("my_dish")
             .and_then(|t| t.get("header"))
             .and_then(|v| v.as_str())
             .unwrap_or("SYS");
 
         // 3. Render
-        let text = if self.show_details {
-            format!("{} CPU:{:.0}% MEM:{:.0}%", header, state.cpu, state.mem)
-        } else {
-            format!("{} OK", header)
-        };
+        // Time to compose our final string
+        let text = format!("{} {}", header, self.counter);
 
-        // Use Ratatui to draw
+        // Draw the text to the buffer using the resolved colors form our theme
         buf.set_string(area.x, area.y, text, Style::default().fg(fg.into()));
         
-        // Draw a status dot
+        // 4. Dynamic Visuals
+        // Finally, let's add a dynamic touch: a status dot that turns red under high load
+        // We retrieve the icon from k_lib matching the active set (nerdfont/ascii)
+        let icon = if state.cookbook.theme.settings.active_icons == "nerdfont" {
+            state.cookbook.icons.nerdfont.get("lightning").map(|s| s.as_str()).unwrap_or("⚡")
+        } else {
+            state.cookbook.icons.ascii.get("lightning").map(|s| s.as_str()).unwrap_or("L")
+        };
+
+        // If CPU is high, override color to red, otherwise use accent
         let dot_color = if state.cpu > 90.0 { Color::Red } else { accent.into() };
+
         if area.width > 2 {
-            buf.get_mut(area.x + area.width - 1, area.y).set_char('•').set_fg(dot_color);
+            // Draw the retrieved icon
+            buf.set_string(area.x + area.width - 1, area.y, icon, Style::default().fg(dot_color));
         }
     }
 }
+```
 
+## 5. Exporting the Dish
+
+To wrap things up, we need to export a creator function. This is how `kitchnsink` discovers and instantiates your dish.
+
+```rust
 #[no_mangle]
 pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
-    Box::new(PowerDish { 
-        last_tick: Duration::ZERO,
-        show_details: false 
+    Box::new(MyDish { 
+        counter: 0,
+        last_update: Duration::ZERO,
+        label: "My Dish".to_string(),
     })
 }
 ```
 
+
 ## 6. Building & Installing
 
-1.  **Build**: `kitchnsink wash power_user.rs`
-2.  **Install**: `kitchnsink load power_user.dish`
-3.  **Activate**: Add `"PowerUser"` to `sink.toml`.
+You've written the code, now let's bring it to life.
+
+### The Manual Way
+1.  **Build**: Run `kitchnsink wash advanced_dish.rs` to compile your work.
+2.  **Install**: Run `kitchnsink load advanced_dish.dish` to move it to the plugins folder.
+3.  **Activate**: Add `"MyAdvancedDish"` to your `sink.toml` configuration file to see it in action.
+
+### The Developer Way (Recommended)
+For a smoother development experience, you can use the helper Mojo script (`ksdev.mojo`). This automates the "wash then load" cycle.
+
+1.  **Prep**: Place your `.rs` file in the `.wash/` directory.
+2.  **Inspect**: Run `mojo ksdev.mojo --check-dish .wash/advanced_dish.rs` to verify your metadata is correct effectively preventing build errors.
+3.  **Wash**: Run `mojo ksdev.mojo --wash`. This compiles your code and moves the artifact to the `.load/` directory.
+4.  **Load**: Run `mojo ksdev.mojo --load`. This installs the dish from the `.load/` directory into your system.
+
+> **Tip**: This workflow keeps your project root clean and ensures a consistent build process!
+
+---
+
+That's it! You have successfully created and deployed a custom dish.
