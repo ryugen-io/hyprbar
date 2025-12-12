@@ -3,7 +3,13 @@ default:
 
 # Build the binary
 build:
-    cargo build -p ks-bin
+    cargo build -p ks-bin --release
+
+# Build and compress with UPX
+build-upx:
+    cargo build -p ks-bin --release
+    upx --best --lzma target/release/ks-bin
+    ls -lh target/release/ks-bin
 
 # Run the binary with debug logging
 run:

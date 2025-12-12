@@ -142,3 +142,9 @@ Once initialized, the application enters an asynchronous event loop (Tokio):
 
 ### 4. Shutdown
 When you send a signal (like Ctrl+C), the application initiates a "Safe Shutdown". It uses the `Kitchn Logger` to print a goodbye message—formatted exactly according to the `shutdown` preset defined in the embedded defaults or your custom cookbook.
+
+### 5. Smart Layout & Scaling
+`kitchnsink` now supports dynamic sizing:
+*   **Row-Based**: Define height by lines of text (`height_rows = 1`). The window shrinks/grows to fit the font.
+*   **Pixel-Based**: Define exact height (`height = 30`). The font auto-scales (`scale_font = true`) to fill the space.
+*   **Pixel Fonts**: Special handling (`pixel_font = true`) ensures fonts only scale by integer factors (1x, 2x) to remain crisp.

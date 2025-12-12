@@ -83,38 +83,11 @@ pub fn run_server(cookbook: Arc<Cookbook>, config: SinkConfig) -> Result<()> {
 
     // 6. Initialize Wayland
     // 6. Initialize Wayland & Smart Scaling
-    let (font_size, window_height) = if let Some(rows) = config.window.height_rows {
-        // Row-based sizing: Height follows Font
-        let fs = 16.0; // Default base size for row-mode
-        let lh = fs * 1.2;
-        let h = (lh * rows as f32).ceil() as u32 + config.window.min_padding;
-        debug!(
-            "Row-based sizing: {} rows -> height {}px (font {}px)",
-            rows, h, fs
-        );
-        (fs, h)
-    } else {
-        // Pixel-based sizing: Font follows Height (Smart Scaling)
-        let target_h = config.window.height;
-        if config.window.scale_font {
-            let available_h = target_h.saturating_sub(config.window.min_padding) as f32;
-            let raw_fs = available_h / 1.2; // Derived from line_height = fs * 1.2
-            let fs = if config.window.pixel_font {
-                let base = config.window.font_base_size as f32;
-                let scale = (raw_fs / base).floor().max(1.0);
-                base * scale
-            } else {
-                raw_fs
-            };
-            debug!(
-                "Smart Scaling: Target {}px -> Font {}px (PixelFont: {})",
-                target_h, fs, config.window.pixel_font
-            );
-            (fs, target_h)
-        } else {
-            (16.0, target_h)
-        }
-    };
+    let (font_size, window_height) = config.window.calculate_dimensions();
+    debug!(
+        "Layout Calculated: Height {}px, Font {}px (Smart Scaling: {}, Pixel Font: {})",
+        window_height, font_size, config.window.scale_font, config.window.pixel_font
+    );
 
     let (mut wayland_state, mut event_queue, _layer_surface) = init_wayland(
         window_height,

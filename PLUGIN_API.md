@@ -26,19 +26,21 @@ pub trait Dish: Send + Sync {
 
 ### Supporting Multiple Instances (Aliasing)
 
-If you want your Dish to be usable multiple times with different configurations (e.g. `[dish.Clock]` and `[dish.Clock2]`), implement `set_instance_config`:
+If you want your Dish to be usable multiple times with different configurations (e.g. `[dish.Clock]` and `[dish.Clock.Work]`), implement `set_instance_config`.
+
+**Notation**: You can use dot notation in your layout list: `modules_right = ["Clock", "Clock.Work"]`.
 
 ```rust
 struct MyDish {
-    config_name: String,
+    instance_name: Option<String>,
 }
 
 impl Dish for MyDish {
     fn set_instance_config(&mut self, name: String) {
-        self.config_name = name;
+        self.instance_name = Some(name);
     }
     
-    // In render/width, use self.config_name instead of "MyDish"
+    // In render/width, use self.instance_name to look up specific config
 }
 ```
 - **name()**: Returns the display name of the plugin (mostly for debugging).

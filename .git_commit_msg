@@ -1,6 +1,8 @@
-feat: fix visual glitch & add sub-dish support
+feat: hardening, benchmarks & upx support
 
-- Fix hardcoded font size in blitter.rs (resolves visual glitch)
-- Add DishEvent enum and input handling logic
-- Implement dot-notation support for sub-dishes (e.g. text_area.text_2)
-- Update text_area example to support instance configuration
+- Refactor Smart Scaling logic into `ks-core` for testability
+- Add unit tests for `WindowConfig::calculate_dimensions`
+- Add `criterion` benchmarks for core logic
+- Add `just build-upx` recipe for binary compression
+- Update documentation (Architecture, Plugin API, Dish Guide) with latest features
+- Update Serena project memory

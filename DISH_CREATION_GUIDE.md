@@ -174,7 +174,7 @@ If you want users to be able to use your Dish multiple times with different conf
 In `sink.toml`, users can then write:
 ```toml
 # Layout
-modules_right = ["MyDish#Work", "MyDish#Home"]
+modules_right = ["MyDish.Work", "MyDish.Home"]
 
 # Base Config (Applied to all)
 [dish.MyDish]
@@ -194,6 +194,7 @@ impl Dish for MyDish {
     // ...
     fn set_instance_config(&mut self, name: String) {
         // Store the alias (e.g. "Work") to look up config later
+        // Note: The system passes you just the alias part if dot notation is used
         self.instance_name = Some(name); 
     }
     
@@ -207,12 +208,7 @@ impl Dish for MyDish {
         } else {
             None
         };
-
-        // 3. Resolve value (Instance > Base > Default)
-        let header = instance.and_then(|t| t.get("header"))
-            .or_else(|| base.and_then(|t| t.get("header")))
-            .and_then(|v| v.as_str())
-            .unwrap_or("DEFAULT");
+        // ... usage logic ...
     }
 }
 ```
