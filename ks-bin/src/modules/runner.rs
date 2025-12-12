@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use k_lib::config::Cookbook;
 use ks_core::config::SinkConfig;
+use ks_core::event::DishEvent;
 use ks_core::renderer::BarRenderer;
 use ks_core::state::BarState;
 use ks_wayland::init as init_wayland;
@@ -81,11 +82,46 @@ pub fn run_server(cookbook: Arc<Cookbook>, config: SinkConfig) -> Result<()> {
     );
 
     // 6. Initialize Wayland
+    // 6. Initialize Wayland & Smart Scaling
+    let (font_size, window_height) = if let Some(rows) = config.window.height_rows {
+        // Row-based sizing: Height follows Font
+        let fs = 16.0; // Default base size for row-mode
+        let lh = fs * 1.2;
+        let h = (lh * rows as f32).ceil() as u32 + config.window.min_padding;
+        debug!(
+            "Row-based sizing: {} rows -> height {}px (font {}px)",
+            rows, h, fs
+        );
+        (fs, h)
+    } else {
+        // Pixel-based sizing: Font follows Height (Smart Scaling)
+        let target_h = config.window.height;
+        if config.window.scale_font {
+            let available_h = target_h.saturating_sub(config.window.min_padding) as f32;
+            let raw_fs = available_h / 1.2; // Derived from line_height = fs * 1.2
+            let fs = if config.window.pixel_font {
+                let base = config.window.font_base_size as f32;
+                let scale = (raw_fs / base).floor().max(1.0);
+                base * scale
+            } else {
+                raw_fs
+            };
+            debug!(
+                "Smart Scaling: Target {}px -> Font {}px (PixelFont: {})",
+                target_h, fs, config.window.pixel_font
+            );
+            (fs, target_h)
+        } else {
+            (16.0, target_h)
+        }
+    };
+
     let (mut wayland_state, mut event_queue, _layer_surface) = init_wayland(
-        config.window.height,
+        window_height,
         config.window.anchor == "bottom",
         Some(config.window.monitor.clone()),
         config.style.font.clone(),
+        font_size,
     )
     .context("Failed to initialize Wayland")?;
     let qh = event_queue.handle();
@@ -143,6 +179,37 @@ pub fn run_server(cookbook: Arc<Cookbook>, config: SinkConfig) -> Result<()> {
         event_queue
             .blocking_dispatch(&mut wayland_state)
             .context("Wayland dispatch failed")?;
+
+        // Process Input Events
+        // We do this after dispatch to handle events received this turn
+        for event in wayland_state.input_events.drain(..) {
+            let char_w = wayland_state.text_renderer.char_width as f64;
+            let char_h = wayland_state.text_renderer.char_height as f64;
+
+            // Extract pixel coordinates if present, else use last known cursor pos
+            let (px, py) = match event {
+                DishEvent::Motion { x, y } | DishEvent::Click { x, y, .. } => (x as f64, y as f64),
+                _ => (wayland_state.cursor_x, wayland_state.cursor_y),
+            };
+
+            // Convert to Cell Coordinates
+            if char_w > 0.0 && char_h > 0.0 {
+                let cx = (px / char_w) as u16;
+                let cy = (py / char_h) as u16;
+
+                // Create a Cell-based event
+                let mut cell_event = event;
+                match &mut cell_event {
+                    DishEvent::Motion { x, y } | DishEvent::Click { x, y, .. } => {
+                        *x = cx;
+                        *y = cy;
+                    }
+                    _ => {} // Leave/Enter/Scroll don't carry x/y in the enum variant usually (except scroll maybe?)
+                }
+
+                renderer.process_input(cx, cy, cell_event);
+            }
+        }
     }
 
     Ok(())

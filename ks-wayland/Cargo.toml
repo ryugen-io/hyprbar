@@ -13,3 +13,4 @@ thiserror = "2.0"
 k-lib = { workspace = true }
 cosmic-text = "0.12.1"
 tracing = { workspace = true }
+ks-core = { path = "../ks-core" }

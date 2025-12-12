@@ -2,15 +2,13 @@ use ks_core::prelude::*;
 use std::borrow::Cow;
 
 pub struct TextArea {
-    content: String,
+    instance_name: Option<String>,
 }
 
 impl TextArea {
     pub fn new() -> Self {
-        // Since we can't pass args to new(), we set a default.
-        // In render(), we check the config for override.
         Self {
-            content: "Kitchn Sink".to_string(),
+            instance_name: None,
         }
     }
 }
@@ -20,32 +18,46 @@ impl Dish for TextArea {
         "text_area"
     }
 
-    fn width(&self, state: &BarState) -> u16 {
-        // Re-read content from state config to ensure dynamic updates
-        let content = state
-            .config
-            .dish
-            .get("text_area")
-            .and_then(|v| v.get("content"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("Kitchn Sink");
+    fn set_instance_config(&mut self, name: String) {
+        self.instance_name = Some(name);
+    }
 
+    fn width(&self, state: &BarState) -> u16 {
+        let content = self.get_content(state);
         content.chars().count() as u16
     }
 
     fn update(&mut self, _dt: std::time::Duration) {}
 
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
-        let content = state
-            .config
-            .dish
-            .get("text_area")
-            .and_then(|v| v.get("content"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("Kitchn Sink");
+        let content = self.get_content(state);
 
-        // Assuming simple default style or config style
+        // TODO: Add style config support
         ratatui::widgets::Paragraph::new(Cow::from(content)).render(area, buf);
+    }
+}
+
+impl TextArea {
+    fn get_content(&self, state: &BarState) -> String {
+        let base_config = state.config.dish.get("text_area").and_then(|v| v.as_table());
+        
+        // 1. Try instance config: [dish.text_area.alias].content
+        if let Some(alias) = &self.instance_name {
+            if let Some(content) = base_config
+                .and_then(|t| t.get(alias))
+                .and_then(|v| v.get("content"))
+                .and_then(|v| v.as_str()) 
+            {
+                return content.to_string();
+            }
+        }
+
+        // 2. Fallback to base config: [dish.text_area].content
+        base_config
+            .and_then(|t| t.get("content"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("Kitchn Sink")
+            .to_string()
     }
 }
 

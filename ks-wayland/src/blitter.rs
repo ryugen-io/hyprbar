@@ -180,7 +180,7 @@ fn flush_run(
     }
 
     // Draw Text with Cosmic Text
-    let font_size = 16.0; // Should match TextRenderer init
+    let font_size = text_renderer.font_size;
     let line_height = font_size * 1.2;
 
     // debug!("Flush run: '{}' (bg={:?}) Cells: {} ", text, bg, width_in_cells);

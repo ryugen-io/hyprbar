@@ -1,8 +1,9 @@
 use crate::state::WaylandState;
+use smithay_client_toolkit::reexports::client::protocol::wl_pointer;
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
-    delegate_compositor, delegate_layer, delegate_output, delegate_registry, delegate_seat,
-    delegate_shm,
+    delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
+    delegate_seat, delegate_shm,
     output::{OutputHandler, OutputState},
     reexports::client::{
         Connection, QueueHandle,
@@ -10,10 +11,67 @@ use smithay_client_toolkit::{
     },
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
+    seat::pointer::{PointerEvent, PointerEventKind, PointerHandler},
     seat::{Capability, SeatHandler, SeatState},
     shell::wlr_layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
     shm::{Shm, ShmHandler},
 };
+
+impl PointerHandler for WaylandState {
+    fn pointer_frame(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _pointer: &wl_pointer::WlPointer,
+        events: &[PointerEvent],
+    ) {
+        use ks_core::event::DishEvent;
+        for event in events {
+            match event.kind {
+                PointerEventKind::Enter { .. } => {
+                    self.input_events.push(DishEvent::Enter);
+                    self.input_events.push(DishEvent::Motion {
+                        x: event.position.0 as u16,
+                        y: event.position.1 as u16,
+                    });
+                    self.cursor_x = event.position.0;
+                    self.cursor_y = event.position.1;
+                }
+                PointerEventKind::Leave { .. } => {
+                    self.input_events.push(DishEvent::Leave);
+                }
+                PointerEventKind::Motion { .. } => {
+                    self.input_events.push(DishEvent::Motion {
+                        x: event.position.0 as u16,
+                        y: event.position.1 as u16,
+                    });
+                    self.cursor_x = event.position.0;
+                    self.cursor_y = event.position.1;
+                }
+                PointerEventKind::Press { button, .. } => {
+                    self.input_events.push(DishEvent::Click {
+                        button,
+                        x: self.cursor_x as u16,
+                        y: self.cursor_y as u16,
+                    });
+                }
+                PointerEventKind::Axis {
+                    horizontal,
+                    vertical,
+                    ..
+                } => {
+                    if horizontal.absolute != 0.0 || vertical.absolute != 0.0 {
+                        self.input_events.push(DishEvent::Scroll {
+                            dx: horizontal.absolute,
+                            dy: vertical.absolute,
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
 
 impl CompositorHandler for WaylandState {
     fn scale_factor_changed(
@@ -129,11 +187,14 @@ impl SeatHandler for WaylandState {
     fn new_seat(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_seat::WlSeat) {}
     fn new_capability(
         &mut self,
-        _: &Connection,
-        _: &QueueHandle<Self>,
-        _: wl_seat::WlSeat,
-        _: Capability,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        seat: wl_seat::WlSeat,
+        capability: Capability,
     ) {
+        if capability == Capability::Pointer && self.seat_state.get_pointer(qh, &seat).is_ok() {
+            log::debug!("Got pointer capability");
+        }
     }
     fn remove_capability(
         &mut self,
@@ -150,6 +211,7 @@ delegate_compositor!(WaylandState);
 delegate_output!(WaylandState);
 delegate_shm!(WaylandState);
 delegate_seat!(WaylandState);
+delegate_pointer!(WaylandState);
 delegate_registry!(WaylandState);
 delegate_layer!(WaylandState);
 

@@ -1,5 +1,6 @@
 pub use crate::config::SinkConfig;
-pub use crate::dish::Dish;
+pub use crate::dish::{Dish, DishProvider};
+pub use crate::event::DishEvent;
 pub use crate::state::BarState;
 pub use k_lib::config::Cookbook;
 pub use k_lib::factory::ColorResolver;

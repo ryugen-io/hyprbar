@@ -21,6 +21,7 @@ pub fn init(
     anchor_bottom: bool,
     monitor: Option<String>,
     font_path: Option<String>,
+    font_size: f32,
 ) -> Result<(WaylandState, EventQueue<WaylandState>, LayerSurface)> {
     let conn = Connection::connect_to_env().context("Failed to connect to Wayland")?;
 
@@ -44,8 +45,8 @@ pub fn init(
     let pool = SlotPool::new(1920 * 1080 * 4, &shm).context("Failed to create Shm pool")?;
 
     // Init TextRenderer
-    let text_renderer =
-        TextRenderer::new(font_path.as_deref()).context("Failed to initialize text renderer")?;
+    let text_renderer = TextRenderer::new(font_path.as_deref(), font_size)
+        .context("Failed to initialize text renderer")?;
 
     let mut state = WaylandState {
         registry_state,
@@ -62,6 +63,9 @@ pub fn init(
         width: 0,
         height: 0,
         text_renderer,
+        cursor_x: 0.0,
+        cursor_y: 0.0,
+        input_events: Vec::new(),
     };
 
     // Roundtrip to populate globals (especially outputs)

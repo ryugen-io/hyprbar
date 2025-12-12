@@ -9,6 +9,19 @@ use ratatui::prelude::*;
 use std::time::Duration;
 use tachyonfx::{Effect, Interpolation, fx};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum DishSection {
+    Left,
+    Center,
+    Right,
+}
+
+struct HitDish {
+    area: Rect,
+    section: DishSection,
+    index: usize,
+}
+
 pub struct BarRenderer {
     buffer: Buffer,
     effects: Vec<Effect>,
@@ -17,6 +30,8 @@ pub struct BarRenderer {
     left_dishes: Vec<Box<dyn Dish>>,
     center_dishes: Vec<Box<dyn Dish>>,
     right_dishes: Vec<Box<dyn Dish>>,
+    hit_map: Vec<HitDish>,
+    hovered_dish: Option<(DishSection, usize)>,
 }
 
 impl BarRenderer {
@@ -51,6 +66,93 @@ impl BarRenderer {
             left_dishes,
             center_dishes,
             right_dishes,
+            hit_map: Vec::new(),
+            hovered_dish: None,
+        }
+    }
+
+    pub fn process_input(&mut self, x: u16, y: u16, event: crate::event::DishEvent) {
+        use crate::event::DishEvent;
+
+        // If Surface Leave, clear hover
+        if let DishEvent::Leave = event {
+            if let Some((section, idx)) = self.hovered_dish {
+                match section {
+                    DishSection::Left => self.left_dishes[idx].handle_event(DishEvent::Leave),
+                    DishSection::Center => self.center_dishes[idx].handle_event(DishEvent::Leave),
+                    DishSection::Right => self.right_dishes[idx].handle_event(DishEvent::Leave),
+                }
+            }
+            self.hovered_dish = None;
+            return;
+        }
+
+        let mut hit_found = None;
+        for hit in &self.hit_map {
+            if x >= hit.area.x
+                && x < hit.area.x + hit.area.width
+                && y >= hit.area.y
+                && y < hit.area.y + hit.area.height
+            {
+                hit_found = Some((hit.section, hit.index, hit.area));
+                break;
+            }
+        }
+
+        if let Some((section, idx, area)) = hit_found {
+            // Handle Hover Transitions
+            if self.hovered_dish != Some((section, idx)) {
+                // Leave previous
+                if let Some((old_sec, old_idx)) = self.hovered_dish {
+                    match old_sec {
+                        DishSection::Left => {
+                            self.left_dishes[old_idx].handle_event(DishEvent::Leave)
+                        }
+                        DishSection::Center => {
+                            self.center_dishes[old_idx].handle_event(DishEvent::Leave)
+                        }
+                        DishSection::Right => {
+                            self.right_dishes[old_idx].handle_event(DishEvent::Leave)
+                        }
+                    }
+                }
+                // Enter new
+                match section {
+                    DishSection::Left => self.left_dishes[idx].handle_event(DishEvent::Enter),
+                    DishSection::Center => self.center_dishes[idx].handle_event(DishEvent::Enter),
+                    DishSection::Right => self.right_dishes[idx].handle_event(DishEvent::Enter),
+                }
+                self.hovered_dish = Some((section, idx));
+            }
+
+            // Localize Coordinates
+            let mut local_event = event;
+            match &mut local_event {
+                DishEvent::Motion { x: mx, y: my } | DishEvent::Click { x: mx, y: my, .. } => {
+                    *mx = mx.saturating_sub(area.x);
+                    *my = my.saturating_sub(area.y);
+                }
+                _ => {}
+            }
+
+            // Dispatch Actual Event (Motion, Click, Scroll)
+            match section {
+                DishSection::Left => self.left_dishes[idx].handle_event(local_event),
+                DishSection::Center => self.center_dishes[idx].handle_event(local_event),
+                DishSection::Right => self.right_dishes[idx].handle_event(local_event),
+            }
+        } else {
+            // Hit nothing. If we were hovering something, leave it.
+            if let Some((old_sec, old_idx)) = self.hovered_dish {
+                match old_sec {
+                    DishSection::Left => self.left_dishes[old_idx].handle_event(DishEvent::Leave),
+                    DishSection::Center => {
+                        self.center_dishes[old_idx].handle_event(DishEvent::Leave)
+                    }
+                    DishSection::Right => self.right_dishes[old_idx].handle_event(DishEvent::Leave),
+                }
+            }
+            self.hovered_dish = None;
         }
     }
 
@@ -70,9 +172,14 @@ impl BarRenderer {
             .unwrap_or_else(|| "Loaded Dish: {0} (Type: {1})".to_string());
 
         for raw_name in names {
-            let (name, alias) = raw_name
-                .split_once('#')
-                .unwrap_or((raw_name.as_str(), raw_name.as_str()));
+            // Support both '#' (legacy) and '.' (new) for sub-dishes
+            let (name, alias) = if let Some((n, a)) = raw_name.split_once('.') {
+                (n, a)
+            } else {
+                raw_name
+                    .split_once('#')
+                    .unwrap_or((raw_name.as_str(), raw_name.as_str()))
+            };
 
             if let Some(mut plugin_dish) = provider.create_dish(name) {
                 // Configure instance alias
@@ -120,6 +227,7 @@ impl BarRenderer {
 
         let area = Rect::new(0, 0, self.width, self.height);
         self.buffer.reset();
+        self.hit_map.clear();
 
         // Layout Chunks
         let layout_constraints = [
@@ -138,6 +246,8 @@ impl BarRenderer {
             &mut self.buffer,
             chunks[0],
             &mut self.left_dishes,
+            &mut self.hit_map,
+            DishSection::Left,
             state,
             Alignment::Left,
             dt,
@@ -147,6 +257,8 @@ impl BarRenderer {
             &mut self.buffer,
             chunks[1],
             &mut self.center_dishes,
+            &mut self.hit_map,
+            DishSection::Center,
             state,
             Alignment::Center,
             dt,
@@ -156,13 +268,15 @@ impl BarRenderer {
             &mut self.buffer,
             chunks[2],
             &mut self.right_dishes,
+            &mut self.hit_map,
+            DishSection::Right,
             state,
             Alignment::Right,
             dt,
         );
 
         // Apply effects
-        self.effects.retain_mut(|effect| {
+        self.effects.retain_mut(|effect: &mut Effect| {
             effect.process(dt, &mut self.buffer, area);
             !effect.done()
         });
@@ -170,10 +284,13 @@ impl BarRenderer {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_section(
         buffer: &mut Buffer,
         area: Rect,
         dishes: &mut [Box<dyn Dish>],
+        hit_map: &mut Vec<HitDish>,
+        section: DishSection,
         state: &BarState,
         align: Alignment,
         dt: Duration,
@@ -201,6 +318,11 @@ impl BarRenderer {
             let intersection = render_area.intersection(area);
             if !intersection.is_empty() {
                 dish.render(intersection, buffer, state, dt);
+                hit_map.push(HitDish {
+                    area: intersection,
+                    section,
+                    index: i,
+                });
             }
             current_x += w;
         }

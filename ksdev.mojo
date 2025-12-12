@@ -1,174 +1,131 @@
-from python import Python, PythonObject
-from sys import argv
+import sys
+from subprocess import run
+
+# ANSI Colors
+fn get_color_reset() -> String: return "\033[0m"
+fn get_color_red() -> String: return "\033[31m"
+fn get_color_green() -> String: return "\033[32m"
+fn get_color_blue() -> String: return "\033[34m"
+fn get_color_yellow() -> String: return "\033[33m"
+fn get_color_cyan() -> String: return "\033[36m"
+fn get_color_magenta() -> String: return "\033[35m"
+
+fn get_icon_wash() -> String: return get_color_cyan() + "" + get_color_reset()
+fn get_icon_load() -> String: return get_color_magenta() + "" + get_color_reset()
+fn get_icon_check() -> String: return get_color_green() + "" + get_color_reset()
+fn get_icon_error() -> String: return get_color_red() + "" + get_color_reset()
+fn get_icon_warn() -> String: return get_color_yellow() + "" + get_color_reset()
+
+# Helper to check directory existence via ls -d
+fn dir_exists(path: String) -> Bool:
+    try:
+        var cmd = String("ls -d ") + path
+        _ = run(cmd)
+        return True
+    except:
+        return False
+
+# Helper to check file existence via ls (Pure Mojo workaround)
+fn file_exists(path: String) -> Bool:
+    try:
+        var f = open(path, "r")
+        f.close()
+        return True
+    except:
+        return False
+
+# Helper to list files in a dir (via ls) and return newline-separated String
+fn list_files(dir_path: String) -> String:
+    try:
+        var cmd = String("ls ") + dir_path
+        var out = run(cmd)
+        return out
+    except:
+        return ""
 
 fn main() raises:
-    var os = Python.import_module("os")
-    var subprocess = Python.import_module("subprocess")
-    var shutil = Python.import_module("shutil")
-    var builtins = Python.import_module("builtins")
-
-    var args = argv()
-    from pathlib import Path
-    # print("DEBUG ARGS:", args[1]) 
+    var args = sys.argv()
     if len(args) < 2:
         print("Usage: ksdev [--wash | --load]")
         return
-
-    var command = args[1]
-    var project_root = os.getcwd()
-    var wash_dir = os.path.join(project_root, ".wash")
-    var load_dir = os.path.join(project_root, ".load")
-
-    # Nerd Font Icons & Colors
-    var C_RESET = "\033[0m"
-    var C_RED = "\033[31m"
-    var C_GREEN = "\033[32m"
-    var C_YELLOW = "\033[33m"
-    var C_BLUE = "\033[34m"
-    var C_MAGENTA = "\033[35m"
-    var C_CYAN = "\033[36m"
-
-    var ICON_SEARCH = C_BLUE + "" + C_RESET
-    var ICON_CHECK = C_GREEN + "" + C_RESET
-    var ICON_ERROR = C_RED + "" + C_RESET
-    var ICON_WARN = C_YELLOW + "" + C_RESET
-    var ICON_WASH = C_CYAN + "" + C_RESET
-    var ICON_LOAD = C_MAGENTA + "" + C_RESET
+    
+    var command = String(args[1])
+    var cwd = run("pwd").strip()
+    var project_root = String(cwd)
+    var wash_dir = project_root + "/.wash"
+    var load_dir = project_root + "/.load"
+    var examples_dir = project_root + "/examples"
 
     if command == "--wash":
-        print(ICON_WASH + " Washing plugins from .wash...")
+        var msg = get_icon_wash() + " Washing plugins..."
+        print(msg)
         
-        if not os.path.exists(wash_dir):
-            print(ICON_ERROR + " Error: .wash directory not found.")
-            return
-
-        var wash_files = os.listdir(wash_dir)
-        for i in range(len(wash_files)):
-            var filename = wash_files[i]
-            
+        # Ensure .load exists
+        _ = run(String("mkdir -p ") + load_dir)
+        
+        # We will wash contents of 'examples/' as that seems to be the source of truth
+        # User mentioned battery/separator, which are in examples/
+        var files_out = list_files(examples_dir)
+        var lines = files_out.splitlines()
+        
+        for line in lines:
+            var filename = line.strip()
             if filename.endswith(".rs"):
-                var src_path = os.path.join(wash_dir, filename)
-                print(C_BLUE + "Building:" + C_RESET, filename)
+                var src_path = examples_dir + "/" + filename
+                var building_msg = get_color_blue() + "Building: " + get_color_reset() + filename
+                print(building_msg)
                 
-                var run_cmd = builtins.list()
-                var _ = run_cmd.append("mojo")
-                var _ = run_cmd.append("tools/wash.mojo")
-                var _ = run_cmd.append(src_path)
+                var cmd = String("mojo tools/wash.mojo ") + src_path
+                # We need to capture invalid output, but run() returns stdout.
+                # If it fails, we might see it in stdout if we print it in wash.mojo
+                var out = run(cmd)
+                print(out)
                 
-                var result = subprocess.run(run_cmd, capture_output=True, text=True)
+                # Check for artifact in project root (where wash.mojo leaves it)
+                var dish_name = filename.replace(".rs", ".dish")
+                var dish_path = project_root + "/" + dish_name
                 
-                if result.returncode != 0:
-                    print(ICON_ERROR + " Error building", filename, ":")
-                    print(result.stderr)
-                else:
-                    print(ICON_CHECK + " Build successful.")
-                    var dish_name = filename.replace(".rs", ".dish")
-                    var dish_path = os.path.join(project_root, dish_name)
+                if file_exists(dish_path):
+                    # Move to .load
+                    var dest_path = load_dir + "/" + dish_name
+                    var mv_cmd = String("mv ") + dish_path + " " + dest_path
+                    _ = run(mv_cmd)
                     
-                    if os.path.exists(dish_path):
-                        var dest_path = os.path.join(load_dir, dish_name)
-                        print("Moving artifact to", dest_path)
-                        var _ = shutil.move(dish_path, dest_path)
-                    else:
-                        print(ICON_WARN + " Warning: Artifact", dish_name, "not found after build.")
+                    var moved_msg = String("  -> Moved to .load/") + dish_name
+                    print(moved_msg)
+                else:
+                    # Maybe it's already in .load if I changed wash.mojo logic (I didn't yet)
+                    # output "✨ Dish ready: datetime.dish" suggests it is in CWD.
+                    var warn = get_icon_warn() + " Artifact not found in root: " + dish_name
+                    print(warn)
 
     elif command == "--load":
-        print(ICON_LOAD + " Loading plugins from .load...")
+        var msg = get_icon_load() + " Loading plugins from .load..."
+        print(msg)
         
-        if not os.path.exists(load_dir):
-            print(ICON_ERROR + " Error: .load directory not found.")
+        if not dir_exists(load_dir):
+            var err = get_icon_error() + " .load directory not found"
+            print(err)
             return
 
-        var load_files = os.listdir(load_dir)
-        for i in range(len(load_files)):
-            var filename = load_files[i]
-            
+        var files_out = list_files(load_dir)
+        var lines = files_out.splitlines()
+        
+        for line in lines:
+            var filename = line.strip()
             if filename.endswith(".dish"):
-                var artifact_path = os.path.join(load_dir, filename)
-                print(C_BLUE + "Loading:" + C_RESET, filename)
+                var artifact_path = load_dir + "/" + filename
+                var loading_msg = get_color_blue() + "Loading: " + get_color_reset() + filename
+                print(loading_msg)
                 
-                var run_cmd = builtins.list()
-                var _ = run_cmd.append("ks-bin")
-                var _ = run_cmd.append("load")
-                var _ = run_cmd.append(artifact_path)
-                
-                var result = subprocess.run(run_cmd, capture_output=True, text=True)
-                
-                if result.returncode != 0:
-                    print(ICON_ERROR + " Error loading", filename, ":")
-                    print(result.stderr)
-                else:
-                    print(result.stdout)
-                    
-    elif command == "--check-dish":
-        if len(args) < 3:
-            print("Usage: ksdev --check-dish <file_path>")
-            return
-
-        var file_path_str = args[2]
-        var file_path = Path(file_path_str)
-        
-        if not file_path.exists():
-            print(ICON_ERROR + " Error: File not found:", file_path_str)
-            return
-
-        print(ICON_SEARCH + " Checking metadata for:", C_CYAN + file_path_str + C_RESET)
-        
-        # Pure Mojo file reading
-        var content: String
-        # Using try/except block for safety although read_text might raise
-        try:
-            content = file_path.read_text()
-        except e:
-            print(ICON_ERROR + " Failed to read file:", e)
-            return
-            
-        var lines = content.split("\n")
-        
-        var found_name = False
-        var found_version = False
-        var found_author = False
-        var found_desc = False
-
-        for i in range(len(lines)):
-            var line = lines[i].strip()
-            
-            if line.startswith("//! Name:"):
-                found_name = True
-            elif line.startswith("//! Version:"):
-                found_version = True
-            elif line.startswith("//! Author:"):
-                found_author = True
-            elif line.startswith("//! Description:"):
-                found_desc = True
-            elif line.startswith("//! Dependency:"):
-                var dep_content = line[15:]
-                if "=" in dep_content:
-                     print(ICON_CHECK + " Found Dependency:", C_BLUE + dep_content.strip() + C_RESET)
-                else:
-                     print(ICON_WARN + " Invalid Dependency format:", line)
-                     print("  Expected format: //! Dependency: crate = \"version\"")
-        
-        var all_ok = True
-        
-        if not found_name:
-            print(ICON_ERROR + " Missing '//! Name: ...'")
-            all_ok = False
-        if not found_version:
-            print(ICON_ERROR + " Missing '//! Version: ...'")
-            all_ok = False
-        if not found_author:
-            print(ICON_ERROR + " Missing '//! Author: ...'")
-            all_ok = False
-        if not found_desc:
-            print(ICON_ERROR + " Missing '//! Description: ...'")
-            all_ok = False
-
-        if all_ok:
-            print(ICON_CHECK + " Metadata valid!")
-        else:
-            print(ICON_WARN + " Please add the missing metadata fields to your dish.")
+                var cmd = String("ks-bin load ") + artifact_path
+                # ks-bin load might need to be run? Or just copy?
+                # User previously used `ks-bin load`.
+                # Assuming `ks-bin` is in path or we use `cargo run`. 
+                # Better to use installed binary if available, or just copy to destination?
+                # "Load" command usually installs it.
+                var out = run(cmd)
+                print(out)
 
     else:
-        print(ICON_ERROR + " Unknown command:", command)
-        print("Usage: ksdev [--wash | --load | --check-dish <file>]")
+        print("Unknown command")

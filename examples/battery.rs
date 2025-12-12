@@ -25,7 +25,38 @@ impl BatteryDish {
             instance_name: None,
         }
     }
-// ... (keep find_battery and read_battery)
+    fn find_battery() -> Option<std::path::PathBuf> {
+        let base = std::path::Path::new("/sys/class/power_supply");
+        if let Ok(entries) = std::fs::read_dir(base) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.starts_with("BAT") {
+                    return Some(entry.path());
+                }
+            }
+        }
+        None
+    }
+
+    fn read_battery(path: &Option<std::path::PathBuf>) -> (u8, bool) {
+        if let Some(path) = path {
+            let capacity = std::fs::read_to_string(path.join("capacity"))
+                .ok()
+                .and_then(|s| s.trim().parse().ok())
+                .unwrap_or(0);
+            
+            let status = std::fs::read_to_string(path.join("status"))
+                .ok()
+                .map(|s| s.trim().to_uppercase())
+                .unwrap_or_default();
+                
+            (capacity, status == "CHARGING")
+        } else {
+            (0, false)
+        }
+    }
+}
 
 impl Dish for BatteryDish {
     fn name(&self) -> &str {
@@ -54,7 +85,7 @@ impl Dish for BatteryDish {
         if area.width == 0 || area.height == 0 {
             return;
         }
-        let _ = state.cookbook.help_me_find_icons;
+
 
         // All colors from config - NO hardcoded values
         let fg_color = Some(state.config.style.fg.as_str()).map(|s| {

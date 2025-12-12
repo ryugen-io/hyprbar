@@ -11,10 +11,11 @@ pub struct TextRenderer {
     pub char_width: usize,
     pub char_height: usize,
     pub font_family: String,
+    pub font_size: f32,
 }
 
 impl TextRenderer {
-    pub fn new(font_path: Option<&str>) -> Result<Self> {
+    pub fn new(font_path: Option<&str>, font_size: f32) -> Result<Self> {
         let swash_cache = SwashCache::new();
 
         // Store the requested family name (or default to "Monospace")
@@ -58,7 +59,6 @@ impl TextRenderer {
         let mut font_system = FontSystem::new_with_locale_and_db("en-US".into(), db);
 
         // 3. Setup Metrics (Fixed Grid)
-        let font_size = 16.0;
         let line_height = font_size * 1.2;
 
         // Create a dummy buffer to measure 'M' width for grid size
@@ -105,6 +105,7 @@ impl TextRenderer {
             char_width,
             char_height,
             font_family,
+            font_size,
         })
     }
 }

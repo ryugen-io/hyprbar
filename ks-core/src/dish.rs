@@ -22,6 +22,11 @@ pub trait Dish: Send + Sync {
     /// The dish should use this name to look up its configuration in `state.config.dish`.
     #[allow(unused_variables)]
     fn set_instance_config(&mut self, name: String) {}
+
+    /// Handle an input event.
+    /// The renderer calls this when an event occurs within the dish's area.
+    #[allow(unused_variables)]
+    fn handle_event(&mut self, event: crate::event::DishEvent) {}
 }
 
 /// A provider that creates dishes by name.

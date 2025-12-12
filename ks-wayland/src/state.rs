@@ -34,6 +34,9 @@ pub struct WaylandState {
     pub height: u32,
 
     pub text_renderer: TextRenderer,
+    pub input_events: Vec<ks_core::event::DishEvent>,
+    pub cursor_x: f64,
+    pub cursor_y: f64,
 }
 
 impl WaylandState {

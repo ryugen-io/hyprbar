@@ -79,6 +79,18 @@ pub struct WindowConfig {
     pub anchor: String, // "top", "bottom"
     #[serde(default = "default_monitor")]
     pub monitor: String,
+
+    // Smart Scaling Options
+    #[serde(default = "default_scale_font")]
+    pub scale_font: bool,
+    #[serde(default)]
+    pub pixel_font: bool,
+    #[serde(default = "default_font_base_size")]
+    pub font_base_size: u32,
+    #[serde(default = "default_min_padding")]
+    pub min_padding: u32,
+    #[serde(default)]
+    pub height_rows: Option<u32>,
 }
 
 impl Default for WindowConfig {
@@ -87,12 +99,29 @@ impl Default for WindowConfig {
             height: 30,
             anchor: "top".to_string(),
             monitor: "primary".to_string(),
+            scale_font: true,
+            pixel_font: false,
+            font_base_size: 10,
+            min_padding: 2,
+            height_rows: None,
         }
     }
 }
 
 fn default_monitor() -> String {
     "primary".to_string()
+}
+
+fn default_scale_font() -> bool {
+    true
+}
+
+fn default_font_base_size() -> u32 {
+    10
+}
+
+fn default_min_padding() -> u32 {
+    2
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
