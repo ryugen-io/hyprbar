@@ -1,0 +1,6 @@
+feat: fix visual glitch & add sub-dish support
+
+- Fix hardcoded font size in blitter.rs (resolves visual glitch)
+- Add DishEvent enum and input handling logic
+- Implement dot-notation support for sub-dishes (e.g. text_area.text_2)
+- Update text_area example to support instance configuration

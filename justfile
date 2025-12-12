@@ -20,7 +20,6 @@ fmt:
 
 # Pre-commit check
 pre-commit: fmt check
-    git add .
 
 # Install the binary
 install: pre-commit
@@ -32,13 +31,13 @@ stats:
 
 # Dev helper: wash plugins from .wash to .load
 dwash:
-    @./ksdev --wash
+    @mojo ksdev.mojo --wash
 
 # Dev helper: load plugins from .load
 dload:
-    @./ksdev --load
+    @mojo ksdev.mojo --load
 
 # Clean build artifacts (keeps .wash sources safe)
 clean:
     cargo clean
-    rm -rf .load
+    cargo cache -a
