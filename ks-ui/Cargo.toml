@@ -1,0 +1,11 @@
+[package]
+name = "ks-ui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ks-core = { workspace = true }
+k-lib = { workspace = true }
+ratatui = { workspace = true }
+tachyonfx = { workspace = true }
+log = { workspace = true }

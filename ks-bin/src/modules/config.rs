@@ -43,28 +43,67 @@ fn load_recursive_config(path: &Path, base_dir: &Path, cookbook: &Cookbook) -> R
     let mut root_value: Value =
         toml::from_str(&content).with_context(|| format!("Failed to parse TOML in {:?}", path))?;
 
-    // Check for "include" key and collect paths to avoid concurrent borrow
-    let mut include_paths = Vec::new();
+    // Check for "include" key and collect paths
+    let mut include_patterns = Vec::new();
     if let Some(includes) = root_value.get("include").and_then(|v| v.as_array()) {
         for include_val in includes {
             if let Some(include_str) = include_val.as_str() {
-                include_paths.push(include_str.to_string());
+                include_patterns.push(include_str.to_string());
             }
         }
     }
 
-    for include_str in include_paths {
-        let include_path = base_dir.join(&include_str);
-        if include_path.exists() {
-            let included_value = load_recursive_config(&include_path, base_dir, cookbook)?;
-            merge_toml_values(&mut root_value, included_value, cookbook);
-        } else {
-            logger::log_to_terminal(
-                cookbook,
-                "warn",
-                "CONFIG",
-                &format!("Included config not found: {:?}", include_path),
-            );
+    // Expand globs and merge
+    for pattern_str in include_patterns {
+        let pattern_path = base_dir.join(&pattern_str);
+
+        // If it looks like a glob (or just a path), try globbing it
+        // We use pattern_path.to_string_lossy() because glob::glob expects a string pattern
+        let pattern = pattern_path.to_string_lossy();
+
+        match glob::glob(&pattern) {
+            Ok(paths) => {
+                let mut found_any = false;
+                for entry in paths {
+                    match entry {
+                        Ok(path) => {
+                            found_any = true;
+                            // Recursively load the included file
+                            // Note: base_dir for the included file should probably be its parent,
+                            // but sticking to main config_dir as base is safer for relative includes inside includes?
+                            // Standard practice: relative paths are relative to the file they are in.
+                            // But here we passed base_dir. Let's assume includes are relative to config root.
+                            let included_value = load_recursive_config(&path, base_dir, cookbook)?;
+                            merge_toml_values(&mut root_value, included_value, cookbook);
+                        }
+                        Err(e) => {
+                            logger::log_to_terminal(
+                                cookbook,
+                                "warn",
+                                "CONFIG",
+                                &format!("Glob error for pattern '{}': {}", pattern_str, e),
+                            );
+                        }
+                    }
+                }
+
+                if !found_any {
+                    logger::log_to_terminal(
+                        cookbook,
+                        "warn",
+                        "CONFIG",
+                        &format!("No files matched include pattern: '{}'", pattern_str),
+                    );
+                }
+            }
+            Err(e) => {
+                logger::log_to_terminal(
+                    cookbook,
+                    "warn",
+                    "CONFIG",
+                    &format!("Invalid glob pattern '{}': {}", pattern_str, e),
+                );
+            }
         }
     }
 

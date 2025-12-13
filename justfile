@@ -37,11 +37,16 @@ stats:
 
 # Dev helper: wash plugins from .wash to .load
 dwash:
-    @mojo ksdev.mojo --wash
+    @mojo tools/ksdev.mojo --wash
 
 # Dev helper: load plugins from .load
 dload:
-    @mojo ksdev.mojo --load
+    @mojo tools/ksdev.mojo --load
+
+# Run debug inspector (Screenshot + Config)
+inspect:
+    @test -d tools/.venv || (python3 -m venv tools/.venv && tools/.venv/bin/pip install -r tools/requirements.txt)
+    @tools/.venv/bin/python3 tools/debug_view.py
 
 # Clean build artifacts (keeps .wash sources safe)
 clean:

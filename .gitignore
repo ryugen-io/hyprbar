@@ -17,3 +17,7 @@ in-memoria.db
 ksdev
 .wash/
 .load/
+
+# Debug Tooling
+tools/.screenshots/
+tools/.venv/

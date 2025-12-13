@@ -1,8 +1,0 @@
-feat: hardening, benchmarks & upx support
-
-- Refactor Smart Scaling logic into `ks-core` for testability
-- Add unit tests for `WindowConfig::calculate_dimensions`
-- Add `criterion` benchmarks for core logic
-- Add `just build-upx` recipe for binary compression
-- Update documentation (Architecture, Plugin API, Dish Guide) with latest features
-- Update Serena project memory

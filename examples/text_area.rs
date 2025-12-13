@@ -31,9 +31,10 @@ impl Dish for TextArea {
 
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
         let content = self.get_content(state);
-
-        // TODO: Add style config support
-        ratatui::widgets::Paragraph::new(Cow::from(content)).render(area, buf);
+        
+        ks_ui::Label::new(&content)
+            .variant(ks_ui::TypographyVariant::Body)
+            .render(area, buf, state);
     }
 }
 

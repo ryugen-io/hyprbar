@@ -60,7 +60,7 @@ impl BatteryDish {
 
 impl Dish for BatteryDish {
     fn name(&self) -> &str {
-        "Battery"
+        "battery"
     }
 
     fn set_instance_config(&mut self, name: String) {
@@ -87,22 +87,17 @@ impl Dish for BatteryDish {
         }
 
 
-        // All colors from config - NO hardcoded values
-        let fg_color = Some(state.config.style.fg.as_str()).map(|s| {
-            let c = ColorResolver::hex_to_color(s);
-            Color::Rgb(c.r, c.g, c.b)
-        });
-
-        let bg_color = Some(state.config.style.bg.as_str()).map(|s| {
-            let c = ColorResolver::hex_to_color(s);
-            Color::Rgb(c.r, c.g, c.b)
-        });
-
-        // Config Lookup Strategy directly matching user request:
-        // 1. Base Config: [dish.Battery]
-        // 2. Instance Override: [dish.Battery.Mouse]
-        let base_config = state.config.dish.get("Battery").and_then(|v| v.as_table());
+        // Use ThemeExt for standard lookups
+        use ks_ui::ThemeExt;
         
+        // 1. Base Colors from Theme
+        let fg_color = Some(state.cookbook.resolve_color("fg"));
+        let bg_color = Some(state.cookbook.resolve_bg("bg"));
+        let accent_color = Some(state.cookbook.resolve_color("accent"));
+
+        // 2. Dish Config overrides (manual table lookup still needed for instance overrides)
+        // We can keep the existing override logic but simplify the Color parsing
+        let base_config = state.config.dish.get("battery").and_then(|v| v.as_table());
         let instance_config = if let Some(alias) = &self.instance_name {
             base_config.and_then(|t| t.get(alias)).and_then(|v| v.as_table())
         } else {
@@ -110,7 +105,6 @@ impl Dish for BatteryDish {
         };
 
         let resolve_override = |key: &str, fallback: Option<Color>| -> Option<Color> {
-             // Try instance config first, then base config
              instance_config.and_then(|t| t.get(key))
                 .or_else(|| base_config.and_then(|t| t.get(key)))
                 .and_then(|v| v.as_str())
@@ -123,32 +117,18 @@ impl Dish for BatteryDish {
 
         let success_color = resolve_override(
             "color_high",
-            state.config.style.success.as_deref().map(|s| {
-                let c = ColorResolver::hex_to_color(s);
-                Color::Rgb(c.r, c.g, c.b)
-            }),
+            Some(state.cookbook.resolve_color("success")),
         );
 
         let warning_color = resolve_override(
             "color_medium",
-            state.config.style.secondary.as_deref().map(|s| {
-                let c = ColorResolver::hex_to_color(s);
-                Color::Rgb(c.r, c.g, c.b)
-            }),
+            Some(state.cookbook.resolve_color("secondary")), // Use secondary as warning/medium often
         );
 
         let error_color = resolve_override(
             "color_low",
-            state.config.style.error.as_deref().map(|s| {
-                let c = ColorResolver::hex_to_color(s);
-                Color::Rgb(c.r, c.g, c.b)
-            }),
+             Some(state.cookbook.resolve_color("error")),
         );
-
-        let accent_color = state.config.style.accent.as_deref().map(|s| {
-            let c = ColorResolver::hex_to_color(s);
-            Color::Rgb(c.r, c.g, c.b)
-        });
 
         // Choose bar color based on battery level - fallback chain through config colors
         let bar_color = if self.charging {
