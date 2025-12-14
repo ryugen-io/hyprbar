@@ -10,6 +10,22 @@ pub struct Cli {
     /// Enable debug mode with verbose logging in a separate terminal
     #[arg(long, global = true)]
     pub debug: bool,
+
+    /// Start the bar daemon process
+    #[arg(long)]
+    pub start: bool,
+
+    /// Stop the running bar daemon process
+    #[arg(long)]
+    pub stop: bool,
+
+    /// Restart the bar daemon process
+    #[arg(long)]
+    pub restart: bool,
+
+    /// Manage autostart settings (generates script)
+    #[arg(long)]
+    pub autostart: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -21,10 +37,6 @@ pub enum Commands {
     /// Internal command to run the bar process (Hidden)
     #[command(hide = true)]
     InternalRun,
-
-    /// Manage the bar (TUI)
-    #[command(alias = "m")]
-    Manage,
 
     /// Compile a .rs dish file into a .dish plugin
     #[command(alias = "w")]

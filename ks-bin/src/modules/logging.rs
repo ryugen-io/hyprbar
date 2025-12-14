@@ -158,7 +158,9 @@ pub fn init_logging(
     cookbook: Arc<Cookbook>,
     enable_debug: bool,
     config_level: &str,
+
     config_filter: &str,
+    bind_socket: bool,
 ) -> anyhow::Result<()> {
     // 0. Setup LogTracer (Handled automatically by registry().init() if tracing-log feature is enabled)
     // tracing_log::LogTracer::init().map_err(|_| anyhow::anyhow!("Failed to init LogTracer"))?;
@@ -202,51 +204,90 @@ pub fn init_logging(
         cookbook, // passed as Arc already
     };
 
+    // Optional Publisher Layer (Client Side)
+    // Always try to connect if we are NOT the daemon (cli commands)
+    let publisher_layer = if !bind_socket {
+        let socket_path = get_socket_path();
+        if socket_path.exists() {
+            if let Ok(stream) = std::os::unix::net::UnixStream::connect(socket_path) {
+                // Shutdown read to indicate we are only writing (and avoid buffer filling from daemon echo)
+                let _ = stream.shutdown(std::net::Shutdown::Read);
+                Some(SocketPublisherLayer {
+                    stream: Mutex::new(stream),
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     tracing_subscriber::registry()
         .with(env_filter)
         .with(fmt_layer)
         .with(socket_layer)
         .with(file_layer)
+        .with(publisher_layer)
         .init();
 
     // 4. Start Socket Server if debug is enabled
-    if enable_debug {
+    // 4. Start Socket Server if debug is enabled AND we are the daemon
+    if enable_debug && bind_socket {
         let socket_path = get_socket_path();
-        // Remove existing socket
         if socket_path.exists() {
             let _ = fs::remove_file(&socket_path);
         }
 
         let listener = UnixListener::bind(&socket_path).context("Failed to bind debug socket")?;
+        let tx = tx.clone(); // Clone for the spawn
 
-        // Spawn server task
         tokio::spawn(async move {
             loop {
                 match listener.accept().await {
-                    Ok((mut stream, _addr)) => {
-                        // Send startup logs first (Snapshot to avoid holding lock across await)
-                        // This handles the race condition where logs are emitted before the client connects
-                        let startup_logs: Vec<String> = if let Some(buffer) = STARTUP_BUFFER.get() {
-                            if let Ok(lock) = buffer.lock() {
-                                lock.iter().cloned().collect()
-                            } else {
-                                Vec::new()
-                            }
-                        } else {
-                            Vec::new()
-                        };
+                    Ok((stream, _addr)) => {
+                        let (reader, mut writer) = stream.into_split();
+                        let tx_for_read = tx.clone();
+                        let mut rx_for_write = tx.subscribe();
 
-                        for line in startup_logs {
-                            if stream.write_all(line.as_bytes()).await.is_err() {
-                                break;
-                            }
-                        }
-
-                        // Subscribe to live events
-                        let mut rx = tx.subscribe();
+                        // READER TASK (Publisher -> Hub)
                         tokio::spawn(async move {
-                            while let Ok(msg) = rx.recv().await {
-                                if stream.write_all(msg.as_bytes()).await.is_err() {
+                            use tokio::io::{AsyncBufReadExt, BufReader};
+                            let mut buf_reader = BufReader::new(reader);
+                            let mut line = String::new();
+                            while let Ok(n) = buf_reader.read_line(&mut line).await {
+                                if n == 0 {
+                                    break;
+                                } // EOF
+                                let _ = tx_for_read.send(line.clone());
+                                line.clear();
+                            }
+                        });
+
+                        // WRITER TASK (Hub -> Viewer)
+                        tokio::spawn(async move {
+                            // Send startup logs first
+                            let startup_logs: Vec<String> =
+                                if let Some(buffer) = STARTUP_BUFFER.get() {
+                                    if let Ok(lock) = buffer.lock() {
+                                        lock.iter().cloned().collect()
+                                    } else {
+                                        Vec::new()
+                                    }
+                                } else {
+                                    Vec::new()
+                                };
+
+                            for line in startup_logs {
+                                if writer.write_all(line.as_bytes()).await.is_err() {
+                                    return;
+                                }
+                            }
+
+                            while let Ok(msg) = rx_for_write.recv().await {
+                                if writer.write_all(msg.as_bytes()).await.is_err() {
                                     break;
                                 }
                             }
@@ -259,4 +300,59 @@ pub fn init_logging(
     }
 
     Ok(())
+}
+
+/// Layer that publishes logs to a UnixStream (Client Side)
+struct SocketPublisherLayer {
+    stream: Mutex<std::os::unix::net::UnixStream>,
+}
+
+impl<S> Layer<S> for SocketPublisherLayer
+where
+    S: tracing::Subscriber,
+{
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        // Format similarly to SocketSubscriberLayer
+        let metadata = event.metadata();
+        let level_color = match *metadata.level() {
+            tracing::Level::ERROR => "ERROR".red(),
+            tracing::Level::WARN => "WARN".yellow(),
+            tracing::Level::INFO => "INFO".green(),
+            tracing::Level::DEBUG => "DEBUG".blue(),
+            tracing::Level::TRACE => "TRACE".magenta(),
+        };
+
+        let timestamp = chrono::Local::now().format("%H:%M:%S").to_string().dimmed();
+
+        struct MessageVisitor(String);
+        impl tracing::field::Visit for MessageVisitor {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                if field.name() == "message" {
+                    self.0.push_str(&format!("{:?}", value));
+                }
+            }
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                if field.name() == "message" {
+                    self.0.push_str(value);
+                }
+            }
+        }
+
+        let mut visitor = MessageVisitor(String::new());
+        event.record(&mut visitor);
+        let message = visitor.0;
+
+        // Prefix with [CLIENT] or similar? User didn't ask, but helpful.
+        // User just wants to see it.
+        let msg = format!("{} [{}] {}\n", timestamp, level_color, message);
+
+        if let Ok(mut stream) = self.stream.lock() {
+            use std::io::Write;
+            let _ = stream.write_all(msg.as_bytes());
+        }
+    }
 }

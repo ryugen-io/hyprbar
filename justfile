@@ -30,6 +30,7 @@ pre-commit: fmt check
 # Install the binary
 install: pre-commit
     cargo install --path ks-bin --force
+    ./install.sh
 
 # Show project statistics (LOC, binary sizes)
 stats:

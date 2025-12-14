@@ -118,31 +118,27 @@ impl App {
     pub fn execute_selected(&mut self) -> Result<bool> {
         let selected = self.state.selected().unwrap_or(0);
         let action = self.items[selected].action;
+        let self_exe = std::env::current_exe()?;
 
         match action {
             MenuAction::ToggleService => {
                 if self.running {
-                    let my_pid = std::process::id();
-                    for process in self.sys.processes().values() {
-                        let name = process.name();
-                        if (name == "kitchnsink" || name == "ks-bin")
-                            && process.pid().as_u32() != my_pid
-                            && !process
-                                .cmd()
-                                .iter()
-                                .any(|arg| arg == "manage" || arg == "m")
-                        {
-                            process.kill_with(sysinfo::Signal::Term);
-                        }
-                    }
-                } else {
-                    let self_exe = std::env::current_exe()?;
+                    // Use CLI stop command
                     Command::new(&self_exe)
+                        .arg("--stop")
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .spawn()?
+                        .wait()?;
+                } else {
+                    // Use CLI start command
+                    Command::new(&self_exe)
+                        .arg("--start")
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .spawn()?;
                 }
-                // Increase wait time
+                // Increase wait time to allow pid file creation/deletion
                 std::thread::sleep(Duration::from_millis(500));
                 self.check_process();
                 Ok(false)

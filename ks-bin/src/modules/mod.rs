@@ -1,3 +1,4 @@
+pub mod autostart;
 pub mod bootstrap;
 pub mod build;
 pub mod cli;

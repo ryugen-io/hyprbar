@@ -146,8 +146,13 @@ fn merge_toml_values(base: &mut Value, other: Value, cookbook: &Cookbook) {
 }
 
 pub fn get_socket_path() -> PathBuf {
-    let runtime_dir = env::var("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| env::temp_dir());
+    let runtime_dir = dirs::runtime_dir().unwrap_or_else(env::temp_dir);
+
     runtime_dir.join("kitchnsink-debug.sock")
+}
+
+pub fn get_pid_file_path() -> PathBuf {
+    let runtime_dir = dirs::runtime_dir().unwrap_or_else(env::temp_dir);
+
+    runtime_dir.join("kitchnsink.pid")
 }

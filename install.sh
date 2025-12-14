@@ -112,6 +112,19 @@ opacity = 0.95
 # -----------------------------------------------------------------------------
 # Main Installation
 # -----------------------------------------------------------------------------
+stop_running_bar() {
+    if command_exists "${INSTALL_DIR}/${TARGET_NAME}"; then
+        log "Stopping running bar..."
+        "${INSTALL_DIR}/${TARGET_NAME}" --stop || true
+        # Wait a moment for release
+        sleep 1
+    elif pgrep -x "$TARGET_NAME" >/dev/null; then
+        log "Stopping running bar (pkill)..."
+        pkill -x "$TARGET_NAME" || true
+        sleep 1
+    fi
+}
+
 install_from_source() {
     cd "$SCRIPT_DIR" || die "Failed to cd to script directory"
 
@@ -131,6 +144,7 @@ install_from_source() {
     # Install
     local src="target/release/$BIN_NAME"
     if [[ -f "$src" ]]; then
+        stop_running_bar
         cp "$src" "${INSTALL_DIR}/${TARGET_NAME}"
         chmod +x "${INSTALL_DIR}/${TARGET_NAME}"
         success "Installed to ${INSTALL_DIR}/${TARGET_NAME}"
