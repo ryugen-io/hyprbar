@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use k_lib::config::Cookbook;
 use k_lib::logger;
-use ks_core::config::SinkConfig;
+use ks_lib::config::SinkConfig;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};

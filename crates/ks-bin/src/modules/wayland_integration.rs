@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use ks_core::config::SinkConfig;
-use ks_core::event::DishEvent;
-use ks_core::renderer::BarRenderer;
-use ks_core::state::BarState;
+use ks_lib::config::SinkConfig;
+use ks_lib::event::DishEvent;
+use ks_lib::renderer::BarRenderer;
+use ks_lib::state::BarState;
 use ks_wayland::init as init_wayland;
 use ks_wayland::state::WaylandState;
 use log::debug;

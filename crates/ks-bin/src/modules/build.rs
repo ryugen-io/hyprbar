@@ -62,7 +62,7 @@ pub async fn wash_dish(path: &Path, cookbook: &Cookbook) -> Result<()> {
     }
 
     // 3. Add dependencies via cargo add
-    let ks_core_path = std::env::current_dir()?.join("ks-core");
+    let ks_core_path = std::env::current_dir()?.join("crates/ks-lib");
 
     // Add ks-core
     let status = Command::new("cargo")

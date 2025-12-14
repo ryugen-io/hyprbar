@@ -4,7 +4,7 @@ use crate::modules::bootstrap;
 use crate::modules::wayland_integration; // Import the new wayland integration module
 
 use k_lib::config::Cookbook;
-use ks_core::config::SinkConfig;
+use ks_lib::config::SinkConfig;
 use std::sync::Arc;
 
 pub async fn run_server(initial_cookbook: Arc<Cookbook>, initial_config: SinkConfig) -> Result<()> {

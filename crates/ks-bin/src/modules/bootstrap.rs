@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::time::Duration;
 
-use ks_core::{config::SinkConfig, renderer::BarRenderer, state::BarState};
+use ks_lib::{config::SinkConfig, renderer::BarRenderer, state::BarState};
 
 use crate::plugin_loader::PluginManager;
 

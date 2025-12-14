@@ -36,7 +36,7 @@ fn default_log_level() -> String {
 }
 
 fn default_debug_filter() -> String {
-    "info,ks_bin=debug,ks_core=debug,ks_wayland=debug".to_string()
+    "info,ks_bin=debug,ks_lib=debug,ks_wayland=debug".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

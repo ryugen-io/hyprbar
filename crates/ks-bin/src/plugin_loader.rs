@@ -1,4 +1,4 @@
-use ks_core::prelude::*;
+use ks_lib::dish::Dish;
 use libloading::{Library, Symbol};
 use std::collections::HashMap;
 use std::path::Path;
@@ -106,7 +106,7 @@ impl PluginManager {
     }
 }
 
-impl ks_core::dish::DishProvider for PluginManager {
+impl ks_lib::dish::DishProvider for PluginManager {
     fn create_dish(&self, name: &str) -> Option<Box<dyn Dish>> {
         if let Some(creator) = self.creators.get(name) {
             unsafe {

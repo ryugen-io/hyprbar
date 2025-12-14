@@ -1,5 +1,5 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use ks_core::config::WindowConfig;
+use ks_lib::config::WindowConfig;
 
 fn bench_calculate_dimensions(c: &mut Criterion) {
     let mut group = c.benchmark_group("config");

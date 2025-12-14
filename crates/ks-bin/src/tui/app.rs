@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ks_core::config::SinkConfig;
+use ks_lib::config::SinkConfig;
 use ratatui::widgets::ListState;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};

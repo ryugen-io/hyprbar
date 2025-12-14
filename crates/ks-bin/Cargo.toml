@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ks-core = { workspace = true }
+ks-lib = { workspace = true }
 ks-wayland = { workspace = true }
 k-lib = { workspace = true }
 anyhow = { workspace = true }

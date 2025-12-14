@@ -1,5 +1,5 @@
 use super::app::App;
-use ks_core::config::SinkConfig;
+use ks_lib::config::SinkConfig;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},

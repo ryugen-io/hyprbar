@@ -25,7 +25,7 @@ impl PointerHandler for WaylandState {
         _pointer: &wl_pointer::WlPointer,
         events: &[PointerEvent],
     ) {
-        use ks_core::event::DishEvent;
+        use ks_lib::event::DishEvent;
         for event in events {
             match event.kind {
                 PointerEventKind::Enter { .. } => {

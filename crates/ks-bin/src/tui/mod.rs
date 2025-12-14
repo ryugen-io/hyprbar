@@ -9,7 +9,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ks_core::config::SinkConfig;
+use ks_lib::config::SinkConfig;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 

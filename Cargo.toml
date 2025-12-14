@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "ks-core",
-    "ks-wayland",
-    "ks-bin",
-    "ks-ui"
+    "crates/ks-lib",
+    "crates/ks-wayland",
+    "crates/ks-bin",
+    "crates/ks-ui"
 ]
 
 [workspace.package]
@@ -21,9 +21,9 @@ tokio = { version = "1.42", features = ["full"] }
 smithay-client-toolkit = "0.20"
 wayland-client = "0.31"
 k-lib = { git = "https://github.com/ryugen-io/kitchN" }
-ks-core = { path = "./ks-core" }
-ks-wayland = { path = "./ks-wayland" }
-ks-ui = { path = "./ks-ui" }
+ks-lib = { path = "./crates/ks-lib" }
+ks-wayland = { path = "./crates/ks-wayland" }
+ks-ui = { path = "./crates/ks-ui" }
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.9" 
 crossterm = "0.28.1"
