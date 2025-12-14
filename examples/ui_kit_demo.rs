@@ -1,6 +1,6 @@
 use anyhow::Result;
 use k_lib::config::Cookbook;
-use ks_core::prelude::*;
+use ks_lib::prelude::*;
 use ks_ui::{Container, ContainerVariant, Label, TypographyVariant};
 use ratatui::{
     backend::TestBackend,

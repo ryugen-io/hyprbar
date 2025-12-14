@@ -5,7 +5,7 @@
 //! Dependency: chrono = "0.4"
 
 use chrono::Local;
-use ks_core::prelude::*;
+use ks_lib::prelude::*;
 
 /// Configuration keys for [dish.datetime] in sink.toml
 struct DateTimeConfig {

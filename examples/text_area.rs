@@ -1,4 +1,4 @@
-use ks_core::prelude::*;
+use ks_lib::prelude::*;
 use std::borrow::Cow;
 
 pub struct TextArea {

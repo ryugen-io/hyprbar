@@ -1,9 +1,10 @@
+
 //! Name: Battery Widget
 //! Version: 1.2.0
 //! Author: Ryu
 //! Description: Shows battery status with configurable colors
 
-use ks_core::prelude::*;
+use ks_lib::prelude::*;
 
 pub struct BatteryDish {
     percent: u8,
