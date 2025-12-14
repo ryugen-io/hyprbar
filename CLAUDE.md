@@ -11,6 +11,20 @@ just check          # Format check + clippy lints
 just fmt            # Format code
 just install        # Install binary locally
 cargo build --release  # Optimized release build (stripped, opt-level "z")
+
+# CLI Wrappers
+just start          # Start daemon
+just stop           # Stop daemon
+just restart        # Restart daemon
+just autostart      # Configure autostart
+just debug          # Run in debug mode
+just list           # List plugins
+just enable <name>  # Enable plugin
+just disable <name> # Disable plugin
+just wash <path>    # Compile dish
+just load <path>    # Install dish
+just launch         # Run TUI/Server
+just version        # Show version
 ```
 
 ## Architecture

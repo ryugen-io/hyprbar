@@ -34,22 +34,75 @@ install: pre-commit
 
 # Show project statistics (LOC, binary sizes)
 stats:
-    @mojo tools/stats.mojo .
+    @../utils/kitchnsink/stats .
 
 # Dev helper: wash plugins from .wash to .load
 dwash:
-    @mojo tools/ksdev.mojo --wash
+    @../utils/kitchnsink/ksdev --wash
 
 # Dev helper: load plugins from .load
 dload:
-    @mojo tools/ksdev.mojo --load
+    @../utils/kitchnsink/ksdev --load
 
 # Run debug inspector (Screenshot + Config)
 inspect:
-    @test -d tools/.venv || (python3 -m venv tools/.venv && tools/.venv/bin/pip install -r tools/requirements.txt)
-    @tools/.venv/bin/python3 tools/debug_view.py
+    @test -d ../utils/kitchnsink/.venv || (python3 -m venv ../utils/kitchnsink/.venv && ../utils/kitchnsink/.venv/bin/pip install -r ../utils/kitchnsink/requirements.txt)
+    @../utils/kitchnsink/.venv/bin/python3 ../utils/kitchnsink/debug_view.py
 
 # Clean build artifacts (keeps .wash sources safe)
 clean:
     cargo clean
     cargo cache -a
+
+# -----------------------------------------------------------------------------
+# KitchnSink CLI Wrappers (Targeting release binary)
+# -----------------------------------------------------------------------------
+BIN := "target/release/ks-bin"
+
+# Start the bar daemon
+start:
+    {{BIN}} --start
+
+# Stop the bar daemon
+stop:
+    {{BIN}} --stop
+
+# Restart the bar daemon
+restart:
+    {{BIN}} --restart
+
+# Configure autostart
+autostart:
+    {{BIN}} --autostart
+
+# Run in debug mode (separate terminal recommended)
+debug:
+    {{BIN}} --debug
+
+# Run the TUI / Main executable
+launch:
+    {{BIN}}
+
+# List installed plugins
+list:
+    {{BIN}} list
+
+# Enable a plugin
+enable name:
+    {{BIN}} enable {{name}}
+
+# Disable a plugin
+disable name:
+    {{BIN}} disable {{name}}
+
+# Compile a .rs dish file
+wash path:
+    {{BIN}} wash {{path}}
+
+# Load/Install a .dish plugin
+load path:
+    {{BIN}} load {{path}}
+
+# Show version
+version:
+    {{BIN}} --version

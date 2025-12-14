@@ -219,17 +219,17 @@ impl Dish for MyDish {
 You've written the code, now let's bring it to life.
 
 ### The Manual Way
-1.  **Build**: Run `kitchnsink wash advanced_dish.rs` to compile your work.
-2.  **Install**: Run `kitchnsink load advanced_dish.dish` to move it to the plugins folder.
+1.  **Build**: Run `just wash advanced_dish.rs` or `kitchnsink wash advanced_dish.rs` to compile your work.
+2.  **Install**: Run `just load advanced_dish.dish` or `kitchnsink load advanced_dish.dish` to move it to the plugins folder.
 3.  **Activate**: Add `"MyAdvancedDish"` to your `sink.toml` configuration file to see it in action.
 
 ### The Developer Way (Recommended)
-For a smoother development experience, you can use the helper Mojo script (`ksdev.mojo`). This automates the "wash then load" cycle.
+For a smoother development experience, use the `ksdev` tool (wrapped via `just`).
 
 1.  **Prep**: Place your `.rs` file in the `.wash/` directory.
-2.  **Inspect**: Run `mojo ksdev.mojo --check-dish .wash/advanced_dish.rs` to verify your metadata is correct effectively preventing build errors.
-3.  **Wash**: Run `mojo ksdev.mojo --wash`. This compiles your code and moves the artifact to the `.load/` directory.
-4.  **Load**: Run `mojo ksdev.mojo --load`. This installs the dish from the `.load/` directory into your system.
+2.  **Inspect**: Run `just inspect` to verify configuration (visual).
+3.  **Wash**: Run `just dwash` (or `ksdev --wash`). This compiles your code and moves the artifact to the `.load/` directory.
+4.  **Load**: Run `just dload` (or `ksdev --load`). This installs the dish from the `.load/` directory into your system.
 
 > **Tip**: This workflow keeps your project root clean and ensures a consistent build process!
 

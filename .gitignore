@@ -3,8 +3,8 @@
 Cargo.lock
 
 # In-Memoria
-
 in-memoria.db
+in-memoria-vectors.db/
 
 # Logs
 *.log
@@ -19,5 +19,12 @@ ksdev
 .load/
 
 # Debug Tooling
-tools/.screenshots/
-tools/.venv/
+.screenshots/
+.venv/
+
+# Editor / Agent
+.serena/
+.vscode/
+.claude/
+.cargo/
+.agent/

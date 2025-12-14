@@ -157,5 +157,5 @@ pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
 ## Development Workflow
 
 1. Place your plugin source in `.wash/`.
-2. Run `just dwash` to compile and move it to `.load/`.
-3. Use `just install` or run `ks-bin` to test.
+2. Run `just dwash` (or `ksdev --wash`) to compile and move it to `.load/`.
+3. Use `just load` or `just dload` to test.
