@@ -71,7 +71,7 @@ graph TD
         Logger -->|Output| StdOut[Terminal Output]
     end
     
-    subgraph "Runtime & Rendering (ks-core / ks-wayland)"
+    subgraph "Runtime & Rendering (ks-lib / ks-wayland)"
         EventLoop -->|Wayland Event| RenderRef[Render Trigger]
         EventLoop -->|16ms Tick| UpdateRef[Update Trigger]
         

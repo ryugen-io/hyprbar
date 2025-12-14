@@ -94,7 +94,7 @@ Plugins should try to use the following semantic keys to stay consistent with th
 The `Color` type from `ratatui` does NOT support parsing hex strings directly. Use the provided `ColorResolver` helper:
 
 ```rust
-use ks_core::prelude::*; // Import commonly used types including ColorResolver
+use ks_lib::prelude::*; // Import commonly used types including ColorResolver
 
 // ... inside render() ...
 
@@ -119,7 +119,7 @@ if let Some(color) = success_color {
 3. Export the `_create_dish` function:
 
 ```rust
-use ks_core::prelude::*;
+use ks_lib::prelude::*;
 
 struct MyPlugin;
 
