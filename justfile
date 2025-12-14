@@ -33,7 +33,7 @@ install: pre-commit
 
 # Show project statistics (LOC, binary sizes)
 stats:
-    ../utils/kitchn/stats.sh .
+    @mojo tools/stats.mojo .
 
 # Dev helper: wash plugins from .wash to .load
 dwash:

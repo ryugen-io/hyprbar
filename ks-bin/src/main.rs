@@ -110,5 +110,5 @@ async fn main() -> Result<()> {
     logger::log_to_terminal(&cookbook, "info", "SINK", &start_msg);
 
     // 4. Run Server
-    runner::run_server(cookbook, sink_config)
+    runner::run_server(cookbook, sink_config).await
 }

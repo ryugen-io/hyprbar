@@ -7,6 +7,7 @@ edition = "2024"
 ratatui = { workspace = true }
 tachyonfx = { workspace = true }
 k-lib = { workspace = true }
+ks-ui = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 thiserror = "2.0"

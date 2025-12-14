@@ -52,7 +52,6 @@ fn main() raises:
     var command = String(args[1])
     var cwd = run("pwd").strip()
     var project_root = String(cwd)
-    var wash_dir = project_root + "/.wash"
     var load_dir = project_root + "/.load"
     var examples_dir = project_root + "/examples"
 

@@ -2,13 +2,13 @@ use ks_core::prelude::*;
 use std::borrow::Cow;
 
 pub struct Separator {
-    symbol: String,
+    _symbol: String,
 }
 
 impl Separator {
     pub fn new() -> Self {
         Self {
-            symbol: "|".to_string(),
+            _symbol: "|".to_string(),
         }
     }
 }

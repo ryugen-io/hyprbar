@@ -239,7 +239,7 @@ impl Dish for DateTimeDish {
         self.update_display(&config);
 
         // Check for config color override
-        let override_color_str = state
+        let _override_color_str = state
             .config
             .dish
             .get("datetime")
@@ -248,30 +248,9 @@ impl Dish for DateTimeDish {
             .and_then(|v| v.as_str());
 
         // Render using Label
-        // If we have an override, we might need a custom style, 
-        // but Label currently supports variants.
-        // For now, let's use Label but we might need to extend Label to support arbitrary overrides
-        // or just use ThemeExt here + manual paragraph if Label is too restrictive?
-        // Actually, user wants us to use the kit.
-        // Let's use Label::new().variant(Body) by default.
-        // If there is an override color, we might need to modify Label to accept a Style override or custom color?
-        // ks_ui::Label doesn't expose raw Style setters yet in previous step.
-        // Let's assume standard theme usage for now, OR rely on Label::variant().
-        
-        // Wait, Label implementation in previous steps was:
-        // pub fn render(self, area: Rect, buf: &mut Buffer, state: &BarState)
-        
-        // If distinct custom colors are needed per instance that aren't in theme, Label might need a `.style()` method.
-        // But for this refactor, let's stick to the ThemeExt for resolution and standard Label.
-        // If the user wants specific overrides, they usually put it in the theme config now?
-        // The `datetime.rs` had logic to read "color" from dish config.
-        
-        // Let's just render with Label and Body variant for now, 
-        // effectively migrating it to "Theme Driven".
-        
         ks_ui::Label::new(&self.cached_display)
              .variant(ks_ui::TypographyVariant::Body)
-             .render(area, buf, state);
+             .render(area, buf, state.cookbook.as_ref());
     }
 }
 

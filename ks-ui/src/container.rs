@@ -1,5 +1,4 @@
 use crate::style::ThemeExt;
-use ks_core::state::BarState;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -38,26 +37,23 @@ impl Container {
     }
 
     /// Renders the container and returns the inner area for content placement
-    pub fn render(self, area: Rect, buf: &mut Buffer, state: &BarState) -> Rect {
+    pub fn render(self, area: Rect, buf: &mut Buffer, theme: &impl ThemeExt) -> Rect {
         let (bg, border_fg) = match self.variant {
             ContainerVariant::Base => (
-                state.cookbook.resolve_bg("bg"),
-                state.cookbook.resolve_color("fg"), // Normal border
+                theme.resolve_bg("bg"),
+                theme.resolve_color("fg"), // Normal border
             ),
             ContainerVariant::Panel => (
-                state.cookbook.resolve_bg("panel_bg"),
-                state.cookbook.resolve_color("panel_border"),
+                theme.resolve_bg("panel_bg"),
+                theme.resolve_color("panel_border"),
             ),
             ContainerVariant::Glass => (
                 // Glass usually implies semi-transparent, handled by specialized renderers or composition
                 // For now, we map it to a specific key
-                state.cookbook.resolve_bg("glass_bg"),
-                state.cookbook.resolve_color("accent"),
+                theme.resolve_bg("glass_bg"),
+                theme.resolve_color("accent"),
             ),
-            ContainerVariant::Alert => (
-                state.cookbook.resolve_bg("error_bg"),
-                state.cookbook.resolve_color("error"),
-            ),
+            ContainerVariant::Alert => (theme.resolve_bg("error_bg"), theme.resolve_color("error")),
         };
 
         let mut block = Block::default()

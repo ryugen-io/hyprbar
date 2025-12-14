@@ -81,7 +81,7 @@ fn main() raises:
 
     # 5. Write Cargo.toml
     var cargo_toml = String('[package]\nname = "')
-    cargo_toml += dish_name + '"\nversion = "0.1.0"\nedition = "2024"\n\n[workspace]\n\n[lib]\ncrate-type = ["cdylib"]\n\n[dependencies]\nks-core = { path = "../../ks-core" }\nratatui = "0.29.0"\ntachyonfx = { version = "0.21.0", features = ["std-duration"] }\n'
+    cargo_toml += dish_name + '"\nversion = "0.1.0"\nedition = "2024"\n\n[workspace]\n\n[lib]\ncrate-type = ["cdylib"]\n\n[dependencies]\nks-core = { path = "../../ks-core" }\nks-ui = { path = "../../ks-ui" }\nratatui = "0.29.0"\ntachyonfx = { version = "0.21.0", features = ["std-duration"] }\nanyhow = "1.0"\nk-lib = { git = "https://github.com/ryugen-io/kitchN" }\n'
     cargo_toml += extra_deps_str
 
     var f_toml = open(temp_dir + "/Cargo.toml", "w")
@@ -118,7 +118,7 @@ fn main() raises:
         test_f.close()
         exists = True
     except:
-        exists = False
+        _ = 0
         
     if exists:
         _ = run(String("cp ") + target_artifact + " " + output_name)

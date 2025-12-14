@@ -34,7 +34,7 @@ impl Dish for TextArea {
         
         ks_ui::Label::new(&content)
             .variant(ks_ui::TypographyVariant::Body)
-            .render(area, buf, state);
+            .render(area, buf, state.cookbook.as_ref());
     }
 }
 

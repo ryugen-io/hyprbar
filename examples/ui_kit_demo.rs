@@ -4,15 +4,15 @@ use ks_core::prelude::*;
 use ks_ui::{Container, ContainerVariant, Label, TypographyVariant};
 use ratatui::{
     backend::TestBackend,
-    buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     Terminal,
 };
 use std::sync::Arc;
 
+#[allow(dead_code)]
 fn main() -> Result<()> {
     // 1. Mock State
-    let cookbook = Arc::new(Cookbook::load().unwrap_or_else(|_| Cookbook::default()));
+    let cookbook = Arc::new(Cookbook::load().expect("Failed to load kitchn cookbook"));
     let config = SinkConfig::default();
     let state = BarState::new(cookbook, config);
 
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         let inner_area = Container::new()
             .variant(ContainerVariant::Panel)
             .title(" UI Kit Demo ")
-            .render(chunks[0], f.buffer_mut(), &state);
+            .render(chunks[0], f.buffer_mut(), state.cookbook.as_ref());
 
         // Inner Content
         let text_chunks = Layout::default()
@@ -41,11 +41,11 @@ fn main() -> Result<()> {
 
         Label::new("This is a Header")
             .variant(TypographyVariant::Header)
-            .render(text_chunks[0], f.buffer_mut(), &state);
+            .render(text_chunks[0], f.buffer_mut(), state.cookbook.as_ref());
 
         Label::new("This is body text inside a container.")
             .variant(TypographyVariant::Body)
-            .render(text_chunks[1], f.buffer_mut(), &state);
+            .render(text_chunks[1], f.buffer_mut(), state.cookbook.as_ref());
     })?;
 
     println!("Render successful!");
