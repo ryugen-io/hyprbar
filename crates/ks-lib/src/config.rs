@@ -54,6 +54,11 @@ pub struct LayoutConfig {
     pub center: u8,
     #[serde(default = "default_layout_percent")]
     pub right: u8,
+
+    #[serde(default = "default_layout_strategy")]
+    pub strategy: String,
+    #[serde(default = "default_layout_padding")]
+    pub padding: u16,
 }
 
 impl Default for LayoutConfig {
@@ -62,6 +67,8 @@ impl Default for LayoutConfig {
             left: 33,
             center: 33,
             right: 33,
+            strategy: default_layout_strategy(),
+            padding: default_layout_padding(),
             modules_left: vec![],
             modules_center: vec![],
             modules_right: vec![],
@@ -71,6 +78,14 @@ impl Default for LayoutConfig {
 
 fn default_layout_percent() -> u8 {
     33
+}
+
+fn default_layout_strategy() -> String {
+    "grid".to_string()
+}
+
+fn default_layout_padding() -> u16 {
+    1
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

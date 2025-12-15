@@ -148,3 +148,11 @@ When you send a signal (like Ctrl+C), the application initiates a "Safe Shutdown
 *   **Row-Based**: Define height by lines of text (`height_rows = 1`). The window shrinks/grows to fit the font.
 *   **Pixel-Based**: Define exact height (`height = 30`). The font auto-scales (`scale_font = true`) to fill the space.
 *   **Pixel Fonts**: Special handling (`pixel_font = true`) ensures fonts only scale by integer factors (1x, 2x) to remain crisp.
+
+
+### 6. Flex-Grid Layout Engine
+KitchnSink uses a modern "Flex-Grid" system (configurable via `strategy="flex"`):
+*   **Sequential Placement**: Dishes are placed one after another.
+*   **Dynamic Widths**: Sections (Left/Right) grow to fit their content.
+*   **Floating Center**: The Center section floats in the middle of the screen but yields (clamps) if side sections require more space.
+*   **Priority Clipping**: If space runs out, content is safely clipped.

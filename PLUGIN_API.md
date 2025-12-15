@@ -2,6 +2,55 @@
 
 KitchnSink supports dynamic plugins written in Rust. Plugins are compiled as shared libraries (`.so` / `.dylib`) and loaded at runtime.
 
+## Layout & Sizing Protocol
+
+To ensure consistent rendering and prevent overlap, KitchnSink enforces a **Strict 3-Section Grid System**.
+
+### 1. The Grid (Sections)
+The bar is divided into three sections defined in `sink.toml`. You can configure the percentage width of each section:
+
+```toml
+[layout]
+left = 33   # %
+center = 33 # %
+right = 33  # %
+modules_left = ["DishA", "DishB"]
+```
+
+### 2. Sizing Units
+- **Width**: Measured in **Cells** (`u16`). One cell roughly equals one monospaced character width.
+- **Height**: Fixed by the global bar height.
+
+### 3. Placement Strategy
+- **Sequential**: Dishes are rendered one after another. Overlap is **impossible** by design.
+- **Alignment**:
+    - **Left**: Aligned to the start of the Left Section.
+    - **Center**: The *entire group* of center dishes is centered within the Center Section.
+    - **Right**: Aligned to the end of the Right Section.
+- **Clipping**: If dishes exceed their section's allocated width (e.g., >33% of screen), they are hard-clipped.
+
+---
+
+## API Capabilities Matrix
+
+| Category | Component | Description |
+|---|---|---|
+| **Lifecycle** | `name()` | Returns unique plugin name string |
+| | `update(dt)` | Called every tick. **Avoid blocking!** |
+| | `width(state)` | Returns required width in cells (u16) |
+| | `set_instance_config(name)` | Support for multiple instances (aliases) |
+| **Rendering** | `render(...)` | Main draw method. Provides `Rect` and `Buffer`. |
+| | `ratatui::Buffer` | The drawing canvas. |
+| | `ratatui::Rect` | The strict bounds for this dish. |
+| **Input Events** | `handle_event(event)` | Receive input when focused/hovered. |
+| | `Enter` / `Leave` | Pointer enter/leave dish area. |
+| | `Motion {x, y}` | Pointer coordinates relative to dish. |
+| | `Click {btn, x, y}` | Mouse click (1=Left, 2=Middle, 3=Right). |
+| | `Scroll {dx, dy}` | Axis scrolling. |
+| **Context** | `BarState` | Read-only global state passed to methods. |
+| | `state.config` | Access `sink.toml` (layout, styles). |
+| | `state.cookbook` | Access `k-lib` (themes, icons, presets). |
+
 ## Core Concepts
 
 Plugins implement the `Dish` trait. A plugin corresponds to a "dish" in the "kitchen sink".
@@ -53,10 +102,12 @@ impl Dish for MyDish {
 The `BarState` struct provides access to the global configuration and system state.
 
 ```rust
+```rust
 pub struct BarState {
     pub config: SinkConfig,
-    pub system: sysinfo::System, // access to CPU, RAM, etc.
+    pub cookbook: Arc<Cookbook>, // Access to themes, icons, presets
 }
+```
 ```
 
 ## Styling Guidelines

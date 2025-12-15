@@ -2,6 +2,12 @@
 
 A versatile modular status bar and widget system for Wayland, powered by `kitchn` and `ratatui`.
 
+## Features
+- **Dynamic Plugin System**: Load Rust-based plugins (`.dish`) at runtime.
+- **Flex-Grid Layout**: Modern layout engine with dynamic sizing and floating center.
+- **Deep Theming**: Integration with `kitchn` for unified system styling.
+- **Smart Scaling**: Pixel-perfect font scaling based on bar height.
+
 ## Structure
 
 ```

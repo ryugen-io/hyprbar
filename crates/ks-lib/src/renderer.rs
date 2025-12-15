@@ -230,16 +230,27 @@ impl BarRenderer {
         self.hit_map.clear();
 
         // Layout Chunks
-        let layout_constraints = [
-            Constraint::Percentage(state.config.layout.left as u16),
-            Constraint::Percentage(state.config.layout.center as u16),
-            Constraint::Percentage(state.config.layout.right as u16),
-        ];
+        // Check Strategy
+        let strategy = state.config.layout.strategy.as_str();
+        let padding = state.config.layout.padding;
 
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(layout_constraints)
-            .split(area);
+        let chunks = if strategy == "flex" {
+            self.calculate_flex_rects(area, state, padding)
+        } else {
+            // Legacy Grid
+            let layout_constraints = [
+                Constraint::Percentage(state.config.layout.left as u16),
+                Constraint::Percentage(state.config.layout.center as u16),
+                Constraint::Percentage(state.config.layout.right as u16),
+            ];
+
+            let rects = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(layout_constraints)
+                .split(area);
+
+            vec![rects[0], rects[1], rects[2]]
+        };
 
         // Render Left
         Self::render_section(
@@ -251,6 +262,7 @@ impl BarRenderer {
             state,
             Alignment::Left,
             dt,
+            padding,
         );
         // Render Center
         Self::render_section(
@@ -262,6 +274,7 @@ impl BarRenderer {
             state,
             Alignment::Center,
             dt,
+            padding,
         );
         // Render Right
         Self::render_section(
@@ -273,6 +286,7 @@ impl BarRenderer {
             state,
             Alignment::Right,
             dt,
+            padding,
         );
 
         // Apply effects
@@ -294,6 +308,7 @@ impl BarRenderer {
         state: &BarState,
         align: Alignment,
         dt: Duration,
+        padding: u16,
     ) {
         if dishes.is_empty() {
             return;
@@ -324,8 +339,54 @@ impl BarRenderer {
                     index: i,
                 });
             }
-            current_x += w;
+            current_x += w + padding;
         }
+    }
+
+    fn calculate_flex_rects(&self, area: Rect, state: &BarState, padding: u16) -> Vec<Rect> {
+        let left_w = Self::calc_width(&self.left_dishes, state, padding);
+        let right_w = Self::calc_width(&self.right_dishes, state, padding);
+        let center_w = Self::calc_width(&self.center_dishes, state, padding);
+
+        let total_available = area.width;
+
+        // 1. Left (takes what it needs, up to total)
+        let final_left_w = left_w.min(total_available);
+
+        // 2. Right (takes what it needs from remainder)
+        let remaining_after_left = total_available.saturating_sub(final_left_w);
+        let final_right_w = right_w.min(remaining_after_left);
+
+        // 3. Center (tries to be in the middle of screen)
+        let remaining_for_center = remaining_after_left.saturating_sub(final_right_w);
+        let final_center_w = center_w.min(remaining_for_center);
+
+        let left_rect = Rect::new(area.x, area.y, final_left_w, area.height);
+
+        let right_x = area.x + area.width - final_right_w;
+        let right_rect = Rect::new(right_x, area.y, final_right_w, area.height);
+
+        // Center calculation
+        // Ideal X = Center of Screen - Half Center Width
+        let ideal_center_x = area.x + (area.width.saturating_sub(final_center_w)) / 2;
+
+        // Constraints
+        let min_center_x = left_rect.x + left_rect.width; // Cant go into Left
+        let max_center_x = right_rect.x.saturating_sub(final_center_w); // Cant go into Right
+
+        let final_center_x = ideal_center_x.clamp(min_center_x, max_center_x);
+        let center_rect = Rect::new(final_center_x, area.y, final_center_w, area.height);
+
+        vec![left_rect, center_rect, right_rect]
+    }
+
+    fn calc_width(dishes: &[Box<dyn Dish>], state: &BarState, padding: u16) -> u16 {
+        if dishes.is_empty() {
+            return 0;
+        }
+        let sum: u16 = dishes.iter().map(|d| d.width(state)).sum();
+        let gaps = (dishes.len() as u16).saturating_sub(1);
+        sum + gaps * padding
     }
 
     pub fn buffer(&self) -> &Buffer {
