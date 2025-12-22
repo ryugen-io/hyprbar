@@ -64,19 +64,19 @@ pub async fn wash_dish(path: &Path, cookbook: &Cookbook) -> Result<()> {
     // 3. Add dependencies via cargo add
     let ks_core_path = std::env::current_dir()?.join("crates/ks-lib");
 
-    // Add ks-core
+    // Add ks-lib
     let status = Command::new("cargo")
         .arg("add")
-        .arg("ks-core")
+        .arg("ks-lib")
         .arg("--path")
         .arg(&ks_core_path)
         .current_dir(&temp_dir)
         .status()
         .await
-        .context("Failed to add ks-core dependency")?;
+        .context("Failed to add ks-lib dependency")?;
 
     if !status.success() {
-        return Err(anyhow::anyhow!("Failed to add ks-core"));
+        return Err(anyhow::anyhow!("Failed to add ks-lib"));
     }
 
     // Add ratatui
