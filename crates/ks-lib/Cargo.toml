@@ -13,6 +13,7 @@ log = { workspace = true }
 thiserror = "2.0"
 serde = { workspace = true }
 toml = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

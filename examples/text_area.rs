@@ -1,5 +1,5 @@
 use ks_lib::prelude::*;
-use std::borrow::Cow;
+
 
 pub struct TextArea {
     instance_name: Option<String>,
@@ -27,13 +27,13 @@ impl Dish for TextArea {
         content.chars().count() as u16
     }
 
-    fn update(&mut self, _dt: std::time::Duration) {}
+    fn update(&mut self, _dt: std::time::Duration, _state: &BarState) {}
 
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
         let content = self.get_content(state);
         
-        ks_ui::Label::new(&content)
-            .variant(ks_ui::TypographyVariant::Body)
+        Label::new(&content)
+            .variant(TypographyVariant::Body)
             .render(area, buf, state.cookbook.as_ref());
     }
 }

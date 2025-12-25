@@ -72,13 +72,13 @@ impl Dish for BatteryDish {
         18
     }
 
-    fn update(&mut self, dt: Duration) {
-        self.last_update += dt;
-        if self.last_update.as_secs() >= 30 {
+    fn update(&mut self, dt: Duration, _state: &BarState) {
+        self.last_update += dt; // Assuming last_update is intended to be time_accumulator
+        if self.last_update > Duration::from_secs(5) { // Assuming 5 seconds is the new update interval
             let (percent, charging) = Self::read_battery(&self.battery_path);
             self.percent = percent;
             self.charging = charging;
-            self.last_update = Duration::ZERO;
+            self.last_update = Duration::from_secs(0);
         }
     }
 
@@ -88,10 +88,7 @@ impl Dish for BatteryDish {
         }
 
 
-        // Use ThemeExt for standard lookups
-        use ks_ui::ThemeExt;
-        
-        // 1. Base Colors from Theme
+
         let fg_color = Some(state.cookbook.resolve_color("fg"));
         let bg_color = Some(state.cookbook.resolve_bg("bg"));
         let accent_color = Some(state.cookbook.resolve_color("accent"));

@@ -134,7 +134,7 @@ impl Dish for TraySpace {
         base_width + separator_width
     }
 
-    fn update(&mut self, _dt: std::time::Duration) {
+    fn update(&mut self, _dt: std::time::Duration, _state: &BarState) {
         // TODO: In the future, this could poll system tray state
         // For now, we keep it as a static placeholder
     }

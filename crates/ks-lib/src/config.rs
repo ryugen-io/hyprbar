@@ -253,6 +253,15 @@ pub struct StyleConfig {
     #[serde(default)]
     pub error: Option<String>,
     pub font: Option<String>,
+    #[serde(default)]
+    pub animation: Option<AnimationConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct AnimationConfig {
+    pub entry: Option<String>, // e.g. "slide_up", "fade"
+    pub exit: Option<String>,
+    pub duration: Option<u64>, // ms
 }
 
 impl Default for StyleConfig {
@@ -267,6 +276,7 @@ impl Default for StyleConfig {
             success: None,
             error: None,
             font: None,
+            animation: None,
         }
     }
 }

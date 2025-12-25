@@ -12,7 +12,7 @@ pub trait Dish: Send + Sync {
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, dt: std::time::Duration);
 
     /// Update the dish state. called every frame.
-    fn update(&mut self, _dt: std::time::Duration) {}
+    fn update(&mut self, _dt: std::time::Duration, _state: &BarState) {}
 
     /// Return the required width of the dish.
     fn width(&self, state: &BarState) -> u16;

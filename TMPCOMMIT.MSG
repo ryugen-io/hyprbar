@@ -1,0 +1,11 @@
+feat: Event Bus, Animation System, and Runtime Stability Fixes
+
+Details:
+- Core: Implemented `EventBus` in `ks-lib` (tokio broadcast).
+- Core: Integrated `tachyonfx` for declarative animations in `BarRenderer`.
+- Config: Added `[style.animation]` parsing in `sink.toml`.
+- API: Updated `Dish::update` to receive `&BarState` (Breaking change).
+- Fix: Resolved SIGSEGV crash due to ABI mismatch in stale plugins.
+- Fix: Corrected logic/lints in `battery.rs`, `datetime.rs`.
+- Chore: Restored and updated all examples (`tray_space`, `separator`, etc.).
+- Docs: Updated CHANGELOG.md for v0.3.0.

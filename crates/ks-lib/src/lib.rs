@@ -1,4 +1,6 @@
+pub mod bus;
 pub mod config;
+
 pub mod dish;
 pub mod event;
 pub mod prelude;

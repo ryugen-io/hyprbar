@@ -191,7 +191,8 @@ impl DateTimeConfig {
 pub struct DateTimeDish {
     cached_display: String,
     cached_width: u16,
-    last_update: Duration,
+
+    timer: Duration,
 }
 
 impl DateTimeDish {
@@ -199,7 +200,8 @@ impl DateTimeDish {
         Self {
             cached_display: String::new(),
             cached_width: 10,
-            last_update: Duration::from_secs(1), // Force immediate update
+
+            timer: Duration::from_secs(0),
         }
     }
 
@@ -221,11 +223,12 @@ impl Dish for DateTimeDish {
         config.calculate_width()
     }
 
-    fn update(&mut self, dt: Duration) {
-        self.last_update += dt;
-        // Update every 500ms for smooth second transitions
-        if self.last_update.as_millis() >= 500 {
-            self.last_update = Duration::ZERO;
+    fn update(&mut self, dt: Duration, state: &BarState) {
+        self.timer += dt;
+        if self.timer.as_secs_f64() > 1.0 {
+             let config = DateTimeConfig::from_state(state);
+            self.update_display(&config);
+            self.timer = Duration::from_secs(0);
         }
     }
 
@@ -248,8 +251,8 @@ impl Dish for DateTimeDish {
             .and_then(|v| v.as_str());
 
         // Render using Label
-        ks_ui::Label::new(&self.cached_display)
-             .variant(ks_ui::TypographyVariant::Body)
+        Label::new(&self.cached_display)
+             .variant(TypographyVariant::Body)
              .render(area, buf, state.cookbook.as_ref());
     }
 }

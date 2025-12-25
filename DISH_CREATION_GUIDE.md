@@ -27,22 +27,25 @@ Add the following block to the top of your file to identify your plugin:
 ```
 
 ### Dependency Management
+
 Use `//! Dependency:` lines to include external crates. The build tool (`wash`) will automatically add them to the temporary `Cargo.toml`.
 
 Format: `//! Dependency: crate = "version"`
 
 ### Adding Dependencies
+
 You can now define external crate dependencies directly in your source file using the `//! Dependency:` syntax. These will be automatically injected during the build process.
 
 **Format:** `//! Dependency: crate_name = "version"`
 
 Example:
+
 ```rust
 //! Dependency: serde = { version = "1.0", features = ["derive"] }
 //! Dependency: reqwest = { version = "0.11", features = ["blocking"] }
 ```
 
-> **Note**: `kitchnsink` pre-includes `ks-core`, `ratatui`, and `tachyonfx`. You only need to declare *extra* crates.
+> **Note**: `kitchnsink` pre-includes `ks-core`, `ratatui`, and `tachyonfx`. You only need to declare _extra_ crates.
 
 ## 3. Creating the State Struct
 
@@ -75,7 +78,7 @@ impl Dish for MyDish {
     fn width(&self, _state: &BarState) -> u16 {
         // We can calculate width dynamically here.
         // We'll reserve 14 cells: 10 for the label + 4 for the counter.
-        14 
+        14
     }
 ```
 
@@ -86,11 +89,11 @@ Moving on to the heartbeat of your plugin: the update loop. This method fires ev
 **Note:** This runs on the main thread, so keep it lightweight—avoid blocking operations like network requests here.
 
 ```rust
-    fn update(&mut self, dt: Duration) {
+    fn update(&mut self, dt: Duration, state: &BarState) {
         self.last_update += dt;
-        
+
         // Let's maximize the excitement by updating the counter once every second
-        if self.last_update.as_secs() >= 1 {
+        if self.last_update.as_secs_f64() > 1.0 {
             self.counter += 1;
             self.last_update = Duration::ZERO;
         }
@@ -102,6 +105,7 @@ Moving on to the heartbeat of your plugin: the update loop. This method fires ev
 Now for the visual payoff. The `render` method hands you a `ratatui` buffer, which is your canvas for drawing.
 
 You have access to the global `state` object, which is your window into the rest of the system:
+
 - `state.cpu`, `state.mem`: Real-time system stats
 - `state.config`: `kitchnsink` specific settings
 - `state.cookbook`: Global `kitchn` ecosystem settings (themes, icons)
@@ -113,7 +117,7 @@ You have access to the global `state` object, which is your window into the rest
         let fg_hex = &state.config.style.fg;
         let bg_hex = &state.config.style.bg;
         let accent_hex = state.config.style.accent.as_deref().unwrap_or("#ff00ff");
-        
+
         let fg = ColorResolver::hex_to_color(fg_hex);
         let accent = ColorResolver::hex_to_color(accent_hex);
 
@@ -130,7 +134,7 @@ You have access to the global `state` object, which is your window into the rest
 
         // Draw the text to the buffer using the resolved colors form our theme
         buf.set_string(area.x, area.y, text, Style::default().fg(fg.into()));
-        
+
         // 4. Dynamic Visuals
         // Finally, let's add a dynamic touch: a status dot that turns red under high load
         // We retrieve the icon from k_lib matching the active set (nerdfont/ascii)
@@ -158,7 +162,7 @@ To wrap things up, we need to export a creator function. This is how `kitchnsink
 ```rust
 #[no_mangle]
 pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
-    Box::new(MyDish { 
+    Box::new(MyDish {
         counter: 0,
         last_update: Duration::ZERO,
         label: "My Dish".to_string(),
@@ -172,6 +176,7 @@ pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
 If you want users to be able to use your Dish multiple times with different configurations (e.g. `[dish.Clock.Work]` and `[dish.Clock.Home]`), you can implement the `set_instance_config` method.
 
 In `sink.toml`, users can then write:
+
 ```toml
 # Layout
 modules_right = ["MyDish.Work", "MyDish.Home"]
@@ -189,19 +194,20 @@ header = "DEFAULT"
 ```
 
 In your code:
+
 ```rust
 impl Dish for MyDish {
     // ...
     fn set_instance_config(&mut self, name: String) {
         // Store the alias (e.g. "Work") to look up config later
         // Note: The system passes you just the alias part if dot notation is used
-        self.instance_name = Some(name); 
+        self.instance_name = Some(name);
     }
-    
+
     fn render(...) {
         // 1. Get Base Config
         let base = state.config.dish.get("MyDish").and_then(|v| v.as_table());
-        
+
         // 2. Get Instance Config (nested inside base)
         let instance = if let Some(alias) = &self.instance_name {
             base.and_then(|t| t.get(alias)).and_then(|v| v.as_table())
@@ -213,17 +219,18 @@ impl Dish for MyDish {
 }
 ```
 
-
 ## 6. Building & Installing
 
 You've written the code, now let's bring it to life.
 
 ### The Manual Way
+
 1.  **Build**: Run `just wash advanced_dish.rs` or `kitchnsink wash advanced_dish.rs` to compile your work.
 2.  **Install**: Run `just load advanced_dish.dish` or `kitchnsink load advanced_dish.dish` to move it to the plugins folder.
 3.  **Activate**: Add `"MyAdvancedDish"` to your `sink.toml` configuration file to see it in action.
 
 ### The Developer Way (Recommended)
+
 For a smoother development experience, use the `ksdev` tool (wrapped via `just`).
 
 1.  **Prep**: Place your `.rs` file in the `.wash/` directory.

@@ -30,7 +30,7 @@ impl Dish for Separator {
         symbol.chars().count() as u16
     }
 
-    fn update(&mut self, _dt: std::time::Duration) {}
+    fn update(&mut self, _dt: std::time::Duration, _state: &BarState) {}
 
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
         let symbol = state

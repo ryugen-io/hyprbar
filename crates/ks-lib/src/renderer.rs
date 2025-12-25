@@ -45,11 +45,36 @@ impl BarRenderer {
         debug!("Initializing BarRenderer with size {}x{}", width, height);
         let area = Rect::new(0, 0, width, height);
 
-        let effects = vec![fx::fade_from(
-            Color::Cyan,
-            Color::Cyan,
-            (800, Interpolation::SineInOut),
-        )];
+        let mut effects = Vec::new();
+
+        if let Some(anim_config) = &config.style.animation {
+            let duration = anim_config.duration.unwrap_or(800) as u32;
+            if let Some(entry) = &anim_config.entry {
+                match entry.as_str() {
+                    "slide_up" | "slide_down" | "slide_left" | "slide_right" => {
+                        // TODO: Fix slide_in signature (needs 5 args)
+                        effects.push(fx::fade_from(
+                            Color::Black,
+                            Color::Reset,
+                            (duration, Interpolation::SineInOut),
+                        ));
+                    }
+                    "fade" => effects.push(fx::fade_from(
+                        Color::Black,
+                        Color::Reset,
+                        (duration, Interpolation::SineInOut),
+                    )),
+                    _ => debug!("Unknown animation: {}", entry),
+                }
+            }
+        } else {
+            // Default Fallback
+            effects.push(fx::fade_from(
+                Color::Cyan,
+                Color::Cyan,
+                (800, Interpolation::SineInOut),
+            ));
+        }
 
         let left_dishes =
             Self::init_dishes(&config.layout.modules_left, config, cookbook, provider);
@@ -216,13 +241,13 @@ impl BarRenderer {
     pub fn render_frame(&mut self, state: &BarState, dt: Duration) -> Result<()> {
         // Update all dishes first
         for dish in self.left_dishes.iter_mut() {
-            dish.update(dt);
+            dish.update(dt, state);
         }
         for dish in self.center_dishes.iter_mut() {
-            dish.update(dt);
+            dish.update(dt, state);
         }
         for dish in self.right_dishes.iter_mut() {
-            dish.update(dt);
+            dish.update(dt, state);
         }
 
         let area = Rect::new(0, 0, self.width, self.height);
