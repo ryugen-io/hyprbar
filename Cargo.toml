@@ -6,6 +6,11 @@ members = [
     "crates/ks-bin",
     "crates/ks-ui"
 ]
+# Exclude /home/ryu/code/github.com/forks from Cargo workspace scanning
+exclude = [
+    "../../forks",
+    "../../forks/*"
+]
 
 [workspace.package]
 version = "0.1.0"
