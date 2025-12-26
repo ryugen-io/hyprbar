@@ -7,4 +7,5 @@ pub mod prelude;
 pub mod renderer;
 pub mod state;
 pub use serde;
+pub use tachyonfx;
 pub use toml;

@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     let has_action_flag = cli.start || cli.stop || cli.restart || cli.autostart;
     if cli.debug && cli.command.is_none() && !has_action_flag {
         // If debug is on and no subcommand, we spawn the daemon and the viewer, then exit
-        daemon::spawn_bar_daemon(&cookbook)
+        daemon::spawn_bar_daemon(&cookbook, true)
             .await
             .context("Failed to spawn bar daemon")?;
         daemon::spawn_debug_viewer(&cookbook).context("Failed to spawn debug viewer")?; // Not async
@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
     // These take precedence over subcommands for daemon control
     if cli.start {
         debug!("Handling --start flag -> spawning daemon");
-        daemon::spawn_bar_daemon(&cookbook)
+        daemon::spawn_bar_daemon(&cookbook, cli.debug)
             .await
             .context("Failed to spawn bar daemon")?;
         return Ok(());
@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
     }
     if cli.restart {
         debug!("Handling --restart flag -> restarting daemon");
-        daemon::restart_bar_daemon(&cookbook)
+        daemon::restart_bar_daemon(&cookbook, cli.debug)
             .await
             .context("Failed to restart bar daemon")?;
         return Ok(());

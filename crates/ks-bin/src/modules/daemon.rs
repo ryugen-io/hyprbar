@@ -14,7 +14,7 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
 
-pub async fn spawn_bar_daemon(cookbook: &Arc<Cookbook>) -> Result<()> {
+pub async fn spawn_bar_daemon(cookbook: &Arc<Cookbook>, debug: bool) -> Result<()> {
     let self_exe = env::current_exe().context("Failed to get current executable path")?;
     let pid_file_path = get_pid_file_path();
 
@@ -45,9 +45,15 @@ pub async fn spawn_bar_daemon(cookbook: &Arc<Cookbook>) -> Result<()> {
         }
     }
     // Spawn self with internal-run and debug flag
-    let child = Command::new(self_exe)
-        .arg("internal-run")
-        .arg("--debug")
+    // Spawn self with internal-run
+    let mut command = Command::new(self_exe);
+    command.arg("internal-run");
+
+    if debug {
+        command.arg("--debug");
+    }
+
+    let child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -112,7 +118,7 @@ pub async fn terminate_bar_daemon(cookbook: &Arc<Cookbook>) -> Result<()> {
     Ok(())
 }
 
-pub async fn restart_bar_daemon(cookbook: &Arc<Cookbook>) -> Result<()> {
+pub async fn restart_bar_daemon(cookbook: &Arc<Cookbook>, debug: bool) -> Result<()> {
     let msg = cookbook
         .dictionary
         .presets
@@ -125,7 +131,7 @@ pub async fn restart_bar_daemon(cookbook: &Arc<Cookbook>) -> Result<()> {
         .await
         .context("Failed to terminate daemon for restart")?;
     sleep(Duration::from_millis(100)).await;
-    spawn_bar_daemon(cookbook)
+    spawn_bar_daemon(cookbook, debug)
         .await
         .context("Failed to spawn daemon for restart")?;
     Ok(())

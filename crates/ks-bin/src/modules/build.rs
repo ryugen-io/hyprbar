@@ -92,10 +92,12 @@ pub async fn wash_dish(path: &Path, cookbook: &Cookbook) -> Result<()> {
         return Err(anyhow::anyhow!("Failed to add ratatui"));
     }
 
-    // Add tachyonfx
+    // Add tachyonfx with sendable feature for Send + Sync
     let status = Command::new("cargo")
         .arg("add")
         .arg("tachyonfx@0.21.0")
+        .arg("--features")
+        .arg("sendable,std-duration")
         .current_dir(&temp_dir)
         .status()
         .await
