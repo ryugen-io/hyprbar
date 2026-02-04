@@ -1,5 +1,6 @@
 use crate::wayland::state::WaylandState;
 use smithay_client_toolkit::reexports::client::protocol::wl_pointer;
+use smithay_client_toolkit::shell::WaylandSurface;
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     delegate_compositor, delegate_layer, delegate_output, delegate_pointer, delegate_registry,
@@ -157,7 +158,20 @@ impl OutputHandler for WaylandState {
 }
 
 impl LayerShellHandler for WaylandState {
-    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _layer: &LayerSurface) {
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, layer: &LayerSurface) {
+        // Check if it's the popup or main surface
+        if let Some(popup_layer) = &self.popup_layer
+            && popup_layer.wl_surface() == layer.wl_surface()
+        {
+            // Popup was closed externally
+            hyprlog::internal::debug("POPUP", "Popup closed externally");
+            self.popup_layer = None;
+            self.popup_surface = None;
+            self.popup_pool = None;
+            self.popup_configured = false;
+            return;
+        }
+        // Main surface closed
         self.exit = true;
     }
 
@@ -165,16 +179,36 @@ impl LayerShellHandler for WaylandState {
         &mut self,
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
+        layer: &LayerSurface,
         configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
+        // Check if it's the popup or main surface
+        if let Some(popup_layer) = &self.popup_layer
+            && popup_layer.wl_surface() == layer.wl_surface()
+        {
+            // Popup configured
+            if configure.new_size.0 != 0 && configure.new_size.1 != 0 {
+                self.popup_width = configure.new_size.0;
+                self.popup_height = configure.new_size.1;
+            }
+            self.popup_configured = true;
+            self.popup_redraw_requested = true;
+            hyprlog::internal::debug(
+                "POPUP",
+                &format!(
+                    "Popup configured {}x{}",
+                    self.popup_width, self.popup_height
+                ),
+            );
+            return;
+        }
+        // Main surface configured
         if configure.new_size.0 != 0 && configure.new_size.1 != 0 {
             self.width = configure.new_size.0;
             self.height = configure.new_size.1;
         }
         self.configured = true;
-        // ack_configure is handled by sctk logic usually, or we do it if manual
     }
 }
 

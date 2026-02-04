@@ -22,52 +22,52 @@ required-features = ["cli"]
 
 [dependencies]
 # Hypr ecosystem
-hyprink = { git = "https://github.com/ryugen-io/hyprink.git", branch = "master", default-features = false }
-hyprlog = { git = "https://github.com/ryugen-io/hyprlog.git", branch = "main", default-features = false }
+hyprink = { git = "ssh://git@github.com/ryugen-io/hyprink.git", branch = "master", default-features = false }
+hyprlog = { git = "ssh://git@github.com/ryugen-io/hyprlog.git", branch = "main", default-features = false }
 
 # Core
-ratatui = "0.30.0"
-tachyonfx = { version = "0.23.0", features = ["std-duration", "sendable"] }
-anyhow = "1.0"
-log = "0.4"
-thiserror = "2.0"
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.9"
+ratatui = "*"
+tachyonfx = { version = "*", features = ["std-duration", "sendable"] }
+anyhow = "*"
+log = "*"
+thiserror = "*"
+serde = { version = "*", features = ["derive"] }
+toml = "*"
 
 # Async
-tokio = { version = "1.49", features = ["full"] }
+tokio = { version = "*", features = ["full"] }
 
 # Wayland
-smithay-client-toolkit = { version = "0.20", features = ["calloop"] }
-wayland-client = "0.31"
-cosmic-text = "0.17"
+smithay-client-toolkit = { version = "*", features = ["calloop"] }
+wayland-client = "*"
+cosmic-text = "*"
 
 # CLI
-clap = { version = "4.5", features = ["derive"], optional = true }
-colored = "3.0.0"
-which = "8.0.0"
-chrono = "0.4"
-crossterm = "0.28.1"
-sysinfo = "0.37"
+clap = { version = "*", features = ["derive"], optional = true }
+colored = "*"
+which = "*"
+chrono = "*"
+crossterm = "*"
+sysinfo = "*"
 
 # Tracing
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-appender = "0.2"
-tracing-log = "0.2.0"
+tracing = "*"
+tracing-subscriber = { version = "*", features = ["env-filter"] }
+tracing-appender = "*"
+tracing-log = "*"
 
 # Misc
-libloading = "0.9.0"
-dirs = "6.0.0"
-bincode = "1.3"
-serde_json = "1.0"
-procfs = "0.16"
-nix = { version = "0.27", features = ["signal"] }
-glob = "0.3.3"
+libloading = "*"
+dirs = "*"
+postcard = { version = "*", features = ["alloc"] }
+serde_json = "*"
+procfs = "*"
+nix = { version = "*", features = ["signal"] }
+glob = "*"
 
 [dev-dependencies]
-tempfile = "3"
-criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "*"
+criterion = { version = "*", features = ["html_reports"] }
 
 [profile.release]
 lto = true

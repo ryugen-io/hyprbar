@@ -3,6 +3,7 @@ use anyhow::Context;
 use hyprink::config::Config;
 use ratatui::buffer::Buffer;
 use smithay_client_toolkit::reexports::client::protocol::wl_shm;
+use smithay_client_toolkit::shell::wlr_layer::LayerSurface;
 use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,
@@ -37,6 +38,16 @@ pub struct WaylandState {
     pub input_events: Vec<crate::event::WidgetEvent>,
     pub cursor_x: f64,
     pub cursor_y: f64,
+
+    // Popup state
+    pub popup_surface: Option<WlSurface>,
+    pub popup_layer: Option<LayerSurface>,
+    pub popup_pool: Option<SlotPool>,
+    pub popup_configured: bool,
+    pub popup_width: u32,
+    pub popup_height: u32,
+    pub popup_redraw_requested: bool,
+    pub popup_input_events: Vec<crate::event::WidgetEvent>,
 }
 
 impl WaylandState {
@@ -96,6 +107,56 @@ impl WaylandState {
         }
 
         self.redraw_requested = false;
+        Ok(())
+    }
+
+    pub fn draw_popup(
+        &mut self,
+        _qh: &QueueHandle<Self>,
+        buffer: &Buffer,
+        config_ink: &Config,
+        bg_color_hex: &str,
+    ) -> anyhow::Result<()> {
+        let width = self.popup_width;
+        let height = self.popup_height;
+
+        if width == 0 || height == 0 {
+            return Ok(());
+        }
+
+        let Some(pool) = &mut self.popup_pool else {
+            return Ok(());
+        };
+
+        let stride = width as i32 * 4;
+
+        let (wl_buffer, canvas) = pool
+            .create_buffer(
+                width as i32,
+                height as i32,
+                stride,
+                wl_shm::Format::Argb8888,
+            )
+            .context("Failed to create popup buffer")?;
+
+        blit_buffer_to_pixels(
+            buffer,
+            canvas,
+            width,
+            height,
+            config_ink,
+            &mut self.text_renderer,
+            bg_color_hex,
+        );
+
+        if let Some(surface) = &self.popup_surface {
+            surface.attach(Some(wl_buffer.wl_buffer()), 0, 0);
+            surface.damage_buffer(0, 0, width as i32, height as i32);
+            surface.frame(_qh, surface.clone());
+            surface.commit();
+        }
+
+        self.popup_redraw_requested = false;
         Ok(())
     }
 }

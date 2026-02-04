@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use bincode::{deserialize, serialize};
+use postcard::{from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -45,7 +45,7 @@ impl Registry {
             return Ok(Self::default());
         }
 
-        let registry = deserialize(&bytes).context("Failed to deserialize registry")?;
+        let registry = from_bytes(&bytes).context("Failed to deserialize registry")?;
         Ok(registry)
     }
 
@@ -58,7 +58,7 @@ impl Registry {
             fs::create_dir_all(parent).context("Failed to create registry directory")?;
         }
 
-        let bytes = serialize(self).context("Failed to serialize registry")?;
+        let bytes = to_allocvec(self).context("Failed to serialize registry")?;
         fs::write(&path, bytes).context("Failed to write registry file")?;
         Ok(())
     }

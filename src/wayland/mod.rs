@@ -61,6 +61,15 @@ pub fn init(
         cursor_x: 0.0,
         cursor_y: 0.0,
         input_events: Vec::new(),
+        // Popup state
+        popup_surface: None,
+        popup_layer: None,
+        popup_pool: None,
+        popup_configured: false,
+        popup_width: 0,
+        popup_height: 0,
+        popup_redraw_requested: false,
+        popup_input_events: Vec::new(),
     };
 
     event_queue
@@ -99,4 +108,87 @@ pub fn init(
     state.surface = Some(surface);
 
     Ok((state, event_queue, layer_surface))
+}
+
+use smithay_client_toolkit::reexports::client::QueueHandle;
+
+/// Creates a popup surface for displaying widget popups.
+/// Position is relative to screen, typically calculated from widget position.
+pub fn create_popup_surface(
+    state: &mut WaylandState,
+    qh: &QueueHandle<WaylandState>,
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+    anchor_bottom: bool,
+) -> Result<()> {
+    // Destroy existing popup if any
+    destroy_popup_surface(state);
+
+    // Create popup pool
+    let popup_pool = SlotPool::new((width * height * 4) as usize, &state.shm)
+        .context("Failed to create popup pool")?;
+
+    // Create popup surface
+    let popup_wl_surface = state.compositor_state.create_surface(qh);
+
+    // Create layer surface for popup (Overlay layer = above everything)
+    let popup_layer = state.layer_shell.create_layer_surface(
+        qh,
+        popup_wl_surface.clone(),
+        Layer::Overlay,
+        Some("hyprbar-popup"),
+        None, // Same output as main surface
+    );
+
+    // Configure popup anchoring and margins
+    let anchor = if anchor_bottom {
+        Anchor::BOTTOM | Anchor::LEFT
+    } else {
+        Anchor::TOP | Anchor::LEFT
+    };
+    popup_layer.set_anchor(anchor);
+    popup_layer.set_size(width, height);
+    popup_layer.set_exclusive_zone(0); // Don't reserve space
+    popup_layer.set_margin(y, 0, 0, x); // top, right, bottom, left
+
+    popup_wl_surface.commit();
+
+    state.popup_surface = Some(popup_wl_surface);
+    state.popup_layer = Some(popup_layer);
+    state.popup_pool = Some(popup_pool);
+    state.popup_width = width;
+    state.popup_height = height;
+    state.popup_configured = false;
+    state.popup_redraw_requested = true;
+
+    hyprlog::internal::debug(
+        "POPUP",
+        &format!("Created popup {}x{} at ({}, {})", width, height, x, y),
+    );
+
+    Ok(())
+}
+
+/// Destroys the current popup surface if it exists.
+pub fn destroy_popup_surface(state: &mut WaylandState) {
+    if state.popup_layer.is_some() {
+        hyprlog::internal::debug("POPUP", "Destroying popup surface");
+    }
+
+    // Drop layer surface first (this also destroys the underlying protocol object)
+    state.popup_layer = None;
+
+    // Then destroy the wl_surface
+    if let Some(surface) = state.popup_surface.take() {
+        surface.destroy();
+    }
+
+    state.popup_pool = None;
+    state.popup_configured = false;
+    state.popup_width = 0;
+    state.popup_height = 0;
+    state.popup_redraw_requested = false;
+    state.popup_input_events.clear();
 }

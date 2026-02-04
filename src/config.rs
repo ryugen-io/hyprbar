@@ -238,6 +238,8 @@ fn default_min_padding() -> u32 {
 pub struct StyleConfig {
     #[serde(default)]
     pub window_bg: Option<String>,
+    #[serde(default)]
+    pub popup_bg: Option<String>,
     #[serde(default = "default_bg")]
     pub bg: String,
     #[serde(default = "default_fg")]
@@ -268,6 +270,7 @@ impl Default for StyleConfig {
     fn default() -> Self {
         Self {
             window_bg: None,
+            popup_bg: None,
             bg: default_bg(),
             fg: default_fg(),
             accent: None,
