@@ -1,46 +1,77 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/ks-lib",
-    "crates/ks-wayland",
-    "crates/ks-bin",
-    "crates/ks-ui"
-]
-# Exclude /home/ryu/code/github.com/forks from Cargo workspace scanning
-exclude = [
-    "../../forks",
-    "../../forks/*"
-]
-
-[workspace.package]
+[package]
+name = "hyprbar"
+description = "Wayland status bar for Hyprland"
 version = "0.1.0"
 edition = "2024"
-authors = ["kitchnsink contributors"]
+rust-version = "1.94"
+license = "MIT"
+repository = "https://github.com/ryugen-io/hyprbar"
+autoexamples = false
 
-[workspace.dependencies]
-ratatui = "0.29.0"
-tachyonfx = { version = "0.21.0", features = ["std-duration", "sendable"] }
+[features]
+default = ["cli"]
+cli = ["dep:clap"]
+
+[lib]
+name = "hyprbar"
+
+[[bin]]
+name = "hyprbar"
+path = "src/bin/hyprbar.rs"
+required-features = ["cli"]
+
+[dependencies]
+# Hypr ecosystem
+hyprink = { git = "https://github.com/ryugen-io/hyprink.git", branch = "master", default-features = false }
+hyprlog = { git = "https://github.com/ryugen-io/hyprlog.git", branch = "main", default-features = false }
+
+# Core
+ratatui = "0.30.0"
+tachyonfx = { version = "0.23.0", features = ["std-duration", "sendable"] }
 anyhow = "1.0"
 log = "0.4"
-tokio = { version = "1.42", features = ["full"] }
-smithay-client-toolkit = "0.20"
-wayland-client = "0.31"
-k-lib = { git = "https://github.com/ryugen-io/kitchN" }
-ks-lib = { path = "./crates/ks-lib" }
-ks-wayland = { path = "./crates/ks-wayland" }
-ks-ui = { path = "./crates/ks-ui" }
+thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.9" 
+toml = "0.9"
+
+# Async
+tokio = { version = "1.49", features = ["full"] }
+
+# Wayland
+smithay-client-toolkit = { version = "0.20", features = ["calloop"] }
+wayland-client = "0.31"
+cosmic-text = "0.17"
+
+# CLI
+clap = { version = "4.5", features = ["derive"], optional = true }
+colored = "3.0.0"
+which = "8.0.0"
+chrono = "0.4"
 crossterm = "0.28.1"
 sysinfo = "0.37"
+
+# Tracing
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
+tracing-log = "0.2.0"
+
+# Misc
+libloading = "0.9.0"
+dirs = "6.0.0"
+bincode = "1.3"
+serde_json = "1.0"
+procfs = "0.16"
+nix = { version = "0.27", features = ["signal"] }
+glob = "0.3.3"
+
+[dev-dependencies]
+tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [profile.release]
 lto = true
 codegen-units = 1
 strip = true
-opt-level = "z" # Optimize for size (kitchn philosophy)
-panic = "abort" # Smaller binary, no unwinding needed for simple bar
-
+opt-level = "z"
+panic = "abort"

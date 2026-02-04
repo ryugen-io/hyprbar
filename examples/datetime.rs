@@ -5,7 +5,7 @@
 //! Dependency: chrono = "0.4"
 
 use chrono::Local;
-use ks_lib::prelude::*;
+use hyprbar::prelude::*;
 
 /// Configuration keys for [dish.datetime] in sink.toml
 struct DateTimeConfig {
@@ -45,7 +45,11 @@ impl Default for DateTimeConfig {
 
 impl DateTimeConfig {
     fn from_state(state: &BarState) -> Self {
-        let config = state.config.dish.get("datetime").and_then(|v| v.as_table());
+        let config = state
+            .config
+            .widget
+            .get("datetime")
+            .and_then(|v| v.as_table());
         let mut cfg = Self::default();
 
         if let Some(t) = config {
@@ -188,14 +192,14 @@ impl DateTimeConfig {
     }
 }
 
-pub struct DateTimeDish {
+pub struct DateTimeWidget {
     cached_display: String,
     cached_width: u16,
 
     timer: Duration,
 }
 
-impl DateTimeDish {
+impl DateTimeWidget {
     pub fn new() -> Self {
         Self {
             cached_display: String::new(),
@@ -213,9 +217,9 @@ impl DateTimeDish {
     }
 }
 
-impl Dish for DateTimeDish {
+impl Widget for DateTimeWidget {
     fn name(&self) -> &str {
-        "DateTime"
+        "datetime"
     }
 
     fn width(&self, state: &BarState) -> u16 {
@@ -226,7 +230,7 @@ impl Dish for DateTimeDish {
     fn update(&mut self, dt: Duration, state: &BarState) {
         self.timer += dt;
         if self.timer.as_secs_f64() > 1.0 {
-             let config = DateTimeConfig::from_state(state);
+            let config = DateTimeConfig::from_state(state);
             self.update_display(&config);
             self.timer = Duration::from_secs(0);
         }
@@ -244,7 +248,7 @@ impl Dish for DateTimeDish {
         // Check for config color override
         let _override_color_str = state
             .config
-            .dish
+            .widget
             .get("datetime")
             .and_then(|v| v.as_table())
             .and_then(|t| t.get("color"))
@@ -252,12 +256,18 @@ impl Dish for DateTimeDish {
 
         // Render using Label
         Label::new(&self.cached_display)
-             .variant(TypographyVariant::Body)
-             .render(area, buf, state.cookbook.as_ref());
+            .variant(TypographyVariant::Body)
+            .render(area, buf, state.config_ink.as_ref());
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
-    Box::new(DateTimeDish::new())
+pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
+    Box::new(DateTimeWidget::new())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {
+    static META: &[u8] = b"{\"author\":\"Ryu\",\"description\":\"Configurable date and time display with weekday, week number, and timezone support\",\"name\":\"DateTime\",\"version\":\"1.0.0\"}\0";
+    META.as_ptr() as *const _
 }

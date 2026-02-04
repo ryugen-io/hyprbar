@@ -1,53 +1,66 @@
-use anyhow::Result;
-use k_lib::config::Cookbook;
-use ks_lib::prelude::*;
-use ks_ui::{Container, ContainerVariant, Label, TypographyVariant};
-use ratatui::{
-    backend::TestBackend,
-    layout::{Constraint, Direction, Layout},
-    Terminal,
-};
-use std::sync::Arc;
+//! Name: UI Kit Demo
+//! Version: 1.0.0
+//! Author: Ryu
+//! Description: Animated demo showing UI Kit typography variants
 
-#[allow(dead_code)]
-fn main() -> Result<()> {
-    // 1. Mock State
-    let cookbook = Arc::new(Cookbook::load().expect("Failed to load kitchn cookbook"));
-    let config = SinkConfig::default();
-    let state = BarState::new(cookbook, config);
+use hyprbar::prelude::*;
+use std::sync::Mutex;
+use tachyonfx::{Effect, EffectTimer, Interpolation, fx};
 
-    // 2. Setup Terminal (Test Backend)
-    let backend = TestBackend::new(80, 24);
-    let mut terminal = Terminal::new(backend)?;
+pub struct UiKitDemoWidget {
+    effect: Mutex<Option<Effect>>,
+}
 
-    // 3. Render Loop (Single Frame)
-    terminal.draw(|f| {
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(10), Constraint::Min(0)])
-            .split(f.area());
+impl UiKitDemoWidget {
+    pub fn new() -> Self {
+        Self {
+            effect: Mutex::new(None),
+        }
+    }
+}
 
-        // Outer Container (Panel)
-        let inner_area = Container::new()
-            .variant(ContainerVariant::Panel)
-            .title(" UI Kit Demo ")
-            .render(chunks[0], f.buffer_mut(), state.cookbook.as_ref());
+impl Widget for UiKitDemoWidget {
+    fn name(&self) -> &str {
+        "ui_kit_demo"
+    }
 
-        // Inner Content
-        let text_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1)])
-            .split(inner_area);
+    fn width(&self, _state: &BarState) -> u16 {
+        20
+    }
 
-        Label::new("This is a Header")
-            .variant(TypographyVariant::Header)
-            .render(text_chunks[0], f.buffer_mut(), state.cookbook.as_ref());
+    fn update(&mut self, _dt: Duration, state: &BarState) {
+        let mut effect_lock = self.effect.lock().unwrap();
+        if effect_lock.is_none() {
+            let accent = state.config_ink.resolve_color("accent");
+            // Smooth breathing: fade foreground from accent color over 2.5s, ping-pong loops forever
+            *effect_lock = Some(fx::ping_pong(fx::fade_from_fg(
+                accent,
+                EffectTimer::from_ms(2500, Interpolation::SineInOut),
+            )));
+        }
+    }
 
-        Label::new("This is body text inside a container.")
-            .variant(TypographyVariant::Body)
-            .render(text_chunks[1], f.buffer_mut(), state.cookbook.as_ref());
-    })?;
+    fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, dt: Duration) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
 
-    println!("Render successful!");
-    Ok(())
+        // Render the label
+        Label::new("UI Kit Demo")
+            .variant(TypographyVariant::Accent)
+            .render(area, buf, state.config_ink.as_ref());
+
+        // Apply breathing effect only while running
+        let mut effect_lock = self.effect.lock().unwrap();
+        if let Some(effect) = effect_lock.as_mut() {
+            if effect.running() {
+                effect.process(dt, buf, area);
+            }
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
+    Box::new(UiKitDemoWidget::new())
 }

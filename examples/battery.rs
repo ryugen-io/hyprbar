@@ -1,14 +1,13 @@
-
 //! Name: Battery Widget
 //! Version: 1.2.0
 //! Author: Ryu
 //! Description: Shows battery status with configurable colors
 
-use ks_lib::prelude::*;
-use ks_lib::tachyonfx::{Effect, fx, Interpolation, Motion, pattern::SweepPattern};
+use hyprbar::prelude::*;
 use std::sync::Mutex;
+use tachyonfx::{Effect, Interpolation, Motion, fx, pattern::SweepPattern};
 
-pub struct BatteryDish {
+pub struct BatteryWidget {
     percent: u8,
     charging: bool,
     last_update: Duration,
@@ -26,11 +25,11 @@ enum BatteryState {
     Charging,
 }
 
-impl BatteryDish {
+impl BatteryWidget {
     pub fn new() -> Self {
         let battery_path = Self::find_battery();
         let (percent, charging) = Self::read_battery(&battery_path);
-        
+
         // Initial state logic matches update_effect
         let initial_state = if charging {
             BatteryState::Charging
@@ -49,11 +48,9 @@ impl BatteryDish {
             effect: Mutex::new(None),
             last_state: initial_state,
         };
-        
 
-        
         // Defer effect creation to first update() so we have access to Cookbook
-        // dish.update_effect(); 
+        // dish.update_effect();
         dish
     }
 
@@ -69,38 +66,34 @@ impl BatteryDish {
         let effect_is_none = self.effect.lock().unwrap().is_none();
         if current_state != self.last_state || effect_is_none {
             self.last_state = current_state;
-            
+
             // Resolve accent color for "shine"
             // DIRECT RESOLUTION: Try config first to ensure sink.toml is respected
             let accent = if let Some(hex) = &state.config.style.accent {
                 let c = ColorResolver::hex_to_color(hex);
                 Color::Rgb(c.r, c.g, c.b)
             } else {
-                state.cookbook.resolve_color("accent")
+                state.config_ink.resolve_color("accent")
             };
-            
-            let low_color = state.cookbook.resolve_color("error");
-            
+
+            let low_color = state.config_ink.resolve_color("error");
+
             *self.effect.lock().unwrap() = match current_state {
                 BatteryState::Charging => {
                     // Visor-like sweep (Accent color)
                     // Visor-like sweep (Accent color) - FG only to prevent bg bleed
                     // Using fade_to_fg ensuring the "wave" is the accent color
-                    Some(fx::fade_to_fg(accent, 1500)
-                        .with_pattern(SweepPattern::left_to_right(4))
-                    )
-                },
+                    Some(fx::fade_to_fg(accent, 1500).with_pattern(SweepPattern::left_to_right(4)))
+                }
                 BatteryState::Low => {
                     // Breathing (Red/Error)
-                    Some(fx::ping_pong(
-                        fx::fade_from(
-                            low_color,
-                            Color::Reset,
-                            (750, Interpolation::SineInOut)
-                        )
-                    ))
-                },
-                BatteryState::Normal => None
+                    Some(fx::ping_pong(fx::fade_from(
+                        low_color,
+                        Color::Reset,
+                        (750, Interpolation::SineInOut),
+                    )))
+                }
+                BatteryState::Normal => None,
             };
         }
     }
@@ -125,12 +118,12 @@ impl BatteryDish {
                 .ok()
                 .and_then(|s| s.trim().parse().ok())
                 .unwrap_or(0);
-            
+
             let status = std::fs::read_to_string(path.join("status"))
                 .ok()
                 .map(|s| s.trim().to_uppercase())
                 .unwrap_or_default();
-                
+
             (capacity, status == "CHARGING")
         } else {
             (0, false)
@@ -138,7 +131,7 @@ impl BatteryDish {
     }
 }
 
-impl Dish for BatteryDish {
+impl Widget for BatteryWidget {
     fn name(&self) -> &str {
         "battery"
     }
@@ -153,19 +146,19 @@ impl Dish for BatteryDish {
     }
 
     fn update(&mut self, dt: Duration, _state: &BarState) {
-        self.last_update += dt; 
-        if self.last_update > Duration::from_secs(5) { 
+        self.last_update += dt;
+        if self.last_update > Duration::from_secs(5) {
             let (percent, charging) = Self::read_battery(&self.battery_path);
             self.percent = percent;
             self.charging = charging;
             self.last_update = Duration::from_secs(0);
-            
+
             // Re-evaluate state
             self.update_effect(_state);
         } else {
             // Ensure effect is initialized if it's missing (e.g. on first run)
             if self.effect.lock().unwrap().is_none() && self.charging {
-                 self.update_effect(_state);
+                self.update_effect(_state);
             }
         }
     }
@@ -176,19 +169,26 @@ impl Dish for BatteryDish {
         }
 
         // --- Render Base Content ---
-        let fg_color = Some(state.cookbook.resolve_color("fg"));
-        let bg_color = Some(state.cookbook.resolve_bg("bg"));
-        let accent_color = Some(state.cookbook.resolve_color("accent"));
+        let fg_color = Some(state.config_ink.resolve_color("fg"));
+        let bg_color = Some(state.config_ink.resolve_bg("bg"));
+        let accent_color = Some(state.config_ink.resolve_color("accent"));
 
-        let base_config = state.config.dish.get("battery").and_then(|v| v.as_table());
+        let base_config = state
+            .config
+            .widget
+            .get("battery")
+            .and_then(|v| v.as_table());
         let instance_config = if let Some(alias) = &self.instance_name {
-            base_config.and_then(|t| t.get(alias)).and_then(|v| v.as_table())
+            base_config
+                .and_then(|t| t.get(alias))
+                .and_then(|v| v.as_table())
         } else {
             None
         };
 
         let resolve_override = |key: &str, fallback: Option<Color>| -> Option<Color> {
-             instance_config.and_then(|t| t.get(key))
+            instance_config
+                .and_then(|t| t.get(key))
                 .or_else(|| base_config.and_then(|t| t.get(key)))
                 .and_then(|v| v.as_str())
                 .map(|s| {
@@ -200,18 +200,16 @@ impl Dish for BatteryDish {
 
         let success_color = resolve_override(
             "color_high",
-            Some(state.cookbook.resolve_color("success")),
+            Some(state.config_ink.resolve_color("success")),
         );
 
         let warning_color = resolve_override(
             "color_medium",
-            Some(state.cookbook.resolve_color("secondary")), 
+            Some(state.config_ink.resolve_color("secondary")),
         );
 
-        let error_color = resolve_override(
-            "color_low",
-             Some(state.cookbook.resolve_color("error")),
-        );
+        let error_color =
+            resolve_override("color_low", Some(state.config_ink.resolve_color("error")));
 
         let bar_color = if self.charging {
             success_color.or(fg_color)
@@ -226,7 +224,7 @@ impl Dish for BatteryDish {
         let empty_color = accent_color.or(bg_color);
 
         let icon = if self.charging { "⚡" } else { "" };
-        
+
         let bar_width = 8;
         let filled = (self.percent as usize * bar_width) / 100;
         let empty = bar_width - filled;
@@ -240,48 +238,68 @@ impl Dish for BatteryDish {
 
         // Draw Content
         for ch in icon.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         if x < area.right() && !icon.is_empty() {
             let cell = &mut buf[(x, y)];
             cell.set_char(' ');
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         for ch in bar_filled.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = bar_color { cell.set_fg(c); }
+            if let Some(c) = bar_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         for ch in bar_empty.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = empty_color { cell.set_fg(c); }
+            if let Some(c) = empty_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         if x < area.right() {
             let cell = &mut buf[(x, y)];
             cell.set_char(' ');
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
         for ch in percent_str.chars() {
-            if x >= area.right() { break; }
+            if x >= area.right() {
+                break;
+            }
             let cell = &mut buf[(x, y)];
             cell.set_char(ch);
-            if let Some(c) = fg_color { cell.set_fg(c); }
+            if let Some(c) = fg_color {
+                cell.set_fg(c);
+            }
             x += 1;
         }
 
@@ -294,35 +312,36 @@ impl Dish for BatteryDish {
             // Limit width to filled blocks only
             let visible_width = if filled > 0 { filled } else { 1 }; // Ensure at least 1 width if filled is 0 but state implies we should draw?
             // Actually if filled is 0, we probably shouldn't animate, but 'filled' can be 0 at 0%.
-            
+
             let bar_area = Rect::new(area.x + icon_offset, area.y, visible_width as u16, 1);
-            
+
             // Only apply effect to the bar area, not the icon or percentage
             // We need to ensure the rect is within bounds and valid
             if bar_area.right() <= area.right() && filled > 0 {
                 effect.process(dt, buf, bar_area);
             }
 
-
             // Auto-Loop
             if effect.done() {
-                 let current_state = self.last_state; 
-                 // Resolve colors again for the loop
-                 let accent = if let Some(hex) = &state.config.style.accent {
+                let current_state = self.last_state;
+                // Resolve colors again for the loop
+                let accent = if let Some(hex) = &state.config.style.accent {
                     let c = ColorResolver::hex_to_color(hex);
                     Color::Rgb(c.r, c.g, c.b)
-                 } else {
-                    state.cookbook.resolve_color("accent")
-                 };
-                 let low_color = state.cookbook.resolve_color("error");
-                 
-                 *effect_lock = match current_state {
-                    BatteryState::Charging => Some(fx::fade_to_fg(accent, 1500)
-                        .with_pattern(SweepPattern::left_to_right(4))
+                } else {
+                    state.config_ink.resolve_color("accent")
+                };
+                let low_color = state.config_ink.resolve_color("error");
+
+                *effect_lock = match current_state {
+                    BatteryState::Charging => Some(
+                        fx::fade_to_fg(accent, 1500).with_pattern(SweepPattern::left_to_right(4)),
                     ),
-                    BatteryState::Low => Some(fx::ping_pong(
-                        fx::fade_from(low_color, Color::Reset, (750, Interpolation::SineInOut))
-                    )),
+                    BatteryState::Low => Some(fx::ping_pong(fx::fade_from(
+                        low_color,
+                        Color::Reset,
+                        (750, Interpolation::SineInOut),
+                    ))),
                     BatteryState::Normal => None,
                 };
             }
@@ -331,6 +350,6 @@ impl Dish for BatteryDish {
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
-    Box::new(BatteryDish::new())
+pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
+    Box::new(BatteryWidget::new())
 }

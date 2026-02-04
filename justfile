@@ -3,61 +3,43 @@ default:
 
 # Build the binary
 build:
-    cargo build -p ks-bin --release
+    cargo build --release
 
 # Build and compress with UPX
 build-upx:
-    cargo build -p ks-bin --release
-    upx --best --lzma target/release/ks-bin
-    ls -lh target/release/ks-bin
+    cargo build --release
+    upx --best --lzma target/release/hyprbar
+    ls -lh target/release/hyprbar
 
 # Run the binary with debug logging
 run:
-    RUST_LOG=debug cargo run -p ks-bin
+    RUST_LOG=debug cargo run
 
 # Check for errors and lints
 check:
-    cargo fmt --all -- --check
-    cargo clippy --workspace -- -D warnings
+    cargo fmt -- --check
+    cargo clippy -- -D warnings
 
 # Format code
 fmt:
-    cargo fmt --all
+    cargo fmt
 
 # Pre-commit check
 pre-commit: fmt check
 
 # Install the binary
 install: pre-commit
-    cargo install --path crates/ks-bin --force
+    cargo install --path . --force
     ./install.sh
 
-# Show project statistics (LOC, binary sizes)
-stats:
-    @../utils/kitchnsink/stats .
-
-# Dev helper: wash plugins from .wash to .load
-dwash:
-    @../utils/kitchnsink/ksdev --wash
-
-# Dev helper: load plugins from .load
-dload:
-    @../utils/kitchnsink/ksdev --load
-
-# Run debug inspector (Screenshot + Config)
-inspect:
-    @test -d ../utils/kitchnsink/.venv || (python3 -m venv ../utils/kitchnsink/.venv && ../utils/kitchnsink/.venv/bin/pip install -r ../utils/kitchnsink/requirements.txt)
-    @../utils/kitchnsink/.venv/bin/python3 ../utils/kitchnsink/debug_view.py
-
-# Clean build artifacts (keeps .wash sources safe)
+# Clean build artifacts
 clean:
     cargo clean
-    cargo cache -a
 
 # -----------------------------------------------------------------------------
-# KitchnSink CLI Wrappers (Targeting release binary)
+# Hyprbar CLI Wrappers (Targeting release binary)
 # -----------------------------------------------------------------------------
-BIN := "target/release/ks-bin"
+BIN := "target/release/hyprbar"
 
 # Start the bar daemon
 start:
@@ -75,33 +57,33 @@ restart:
 autostart:
     {{BIN}} --autostart
 
-# Run in debug mode (separate terminal recommended)
+# Restart bar with debug logging (opens debug terminal)
 debug:
-    {{BIN}} --debug
+    {{BIN}} --restart --debug
 
 # Run the TUI / Main executable
 launch:
     {{BIN}}
 
-# List installed plugins
+# List installed widgets
 list:
     {{BIN}} list
 
-# Enable a plugin
+# Enable a widget
 enable name:
     {{BIN}} enable {{name}}
 
-# Disable a plugin
+# Disable a widget
 disable name:
     {{BIN}} disable {{name}}
 
-# Compile a .rs dish file
-wash path:
-    {{BIN}} wash {{path}}
+# Compile a widget from .rs source
+compile path:
+    {{BIN}} compile {{path}}
 
-# Load/Install a .dish plugin
-load path:
-    {{BIN}} load {{path}}
+# Install a compiled widget (.so)
+install-widget path:
+    {{BIN}} install {{path}}
 
 # Show version
 version:

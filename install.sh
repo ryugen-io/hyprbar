@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2155
 # =============================================================================
-# KitchnSink Install Script
+# Hyprbar Install Script
 # Sets up config directory and installs binaries
 # =============================================================================
 
@@ -13,12 +13,13 @@ shopt -s inherit_errexit 2>/dev/null || true
 # Configuration
 # -----------------------------------------------------------------------------
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
-readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/kitchnsink"
+readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+readonly DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hyprbar"
 readonly INSTALL_DIR="${HOME}/.local/bin"
 
 # Project Specifics
-readonly BIN_NAME="ks-bin"
-readonly TARGET_NAME="kitchnsink"
+readonly BIN_NAME="hyprbar"
+readonly TARGET_NAME="hyprbar"
 
 # Colors (Sweet Dracula palette - 24-bit true color)
 readonly GREEN=$'\033[38;2;80;250;123m'
@@ -58,11 +59,11 @@ compact_binary() {
         local size_after=$(stat -c%s "$bin")
         local saved=$(( size_before - size_after ))
         local percent=$(( (saved * 100) / size_before ))
-        
+
         # Convert bytes to readable format
         local size_before_fmt=$(numfmt --to=iec-i --suffix=B "$size_before")
         local size_after_fmt=$(numfmt --to=iec-i --suffix=B "$size_after")
-        
+
         log "Optimized $(basename "$bin"): ${size_before_fmt} -> ${size_after_fmt} (-${percent}%)"
     fi
 }
@@ -70,12 +71,12 @@ compact_binary() {
 write_config() {
     local file="$1"
     local content="$2"
-    
+
     if [[ -f "$file" ]]; then
         log "Config exists, skipping: $(basename "$file")"
         return 0
     fi
-    
+
     log "Creating $(basename "$file")"
     printf '%s\n' "$content" > "$file" || die "Failed to write: $file"
     success "Created $(basename "$file")"
@@ -84,29 +85,27 @@ write_config() {
 # -----------------------------------------------------------------------------
 # Config Templates
 # -----------------------------------------------------------------------------
-SINK_CONFIG='# KitchnSink Configuration
-# Default configuration for the sink bar
+HYPRBAR_CONFIG='# Hyprbar Configuration
 
 [window]
-height = 24
-anchor = "bottom"
-# Monitor to display on: "primary" or output name (e.g. "HDMI-A-1")
-monitor = "primary"
+height = 30
+anchor = "top"
+monitor = ""
+
+[style]
+bg = "#1e1e2e"
+fg = "#cdd6f4"
 
 [layout]
-# Logical partitioning (percentages, default 33/33/33)
 left = 33
-center = 33
+center = 34
 right = 33
-modules_left = ["workspaces"]
-modules_center = ["clock"]
-modules_right = ["systray", "cpu", "memory"]
+modules_left = ["separator"]
+modules_center = ["datetime"]
+modules_right = ["text_area"]
 
-[theme]
-# Uses kitchn styles by default, override here if needed
-opacity = 0.95
-# Path to custom font (optional). If not set, tries default system fonts.
-# font = "/usr/share/fonts/TTF/DejaVuSansMono.ttf"
+[logging]
+level = "info"
 '
 
 # -----------------------------------------------------------------------------
@@ -116,7 +115,6 @@ stop_running_bar() {
     if command_exists "${INSTALL_DIR}/${TARGET_NAME}"; then
         log "Stopping running bar..."
         "${INSTALL_DIR}/${TARGET_NAME}" --stop || true
-        # Wait a moment for release
         sleep 1
     elif pgrep -x "$TARGET_NAME" >/dev/null; then
         log "Stopping running bar (pkill)..."
@@ -133,7 +131,7 @@ install_from_source() {
     fi
 
     log "Building release binary..."
-    if ! cargo build --release -p "$BIN_NAME" 2>&1; then
+    if ! cargo build --release 2>&1; then
         die "Build failed"
     fi
     success "Build complete"
@@ -154,27 +152,28 @@ install_from_source() {
 }
 
 main() {
-    echo -e "${PURPLE}[kitchnsink]${NC} INSTALL  starting installation"
+    echo -e "${PURPLE}[hyprbar]${NC} INSTALL  starting installation"
 
     # Directories
     create_dir "$CONFIG_DIR"
+    create_dir "$DATA_DIR"
+    create_dir "$DATA_DIR/widgets"
     create_dir "$INSTALL_DIR"
 
     # Configs
-    write_config "${CONFIG_DIR}/sink.toml" "$SINK_CONFIG"
+    write_config "${CONFIG_DIR}/hyprbar.conf" "$HYPRBAR_CONFIG"
 
     # Install
     install_from_source
 
     # Summary
-    echo -e "${GREEN}[summary]${NC} summary  installed successfully"
+    echo -e "${GREEN}[summary]${NC} installed successfully"
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
         warn "$INSTALL_DIR not in PATH"
     fi
-    
+
     # Version check
     if command_exists "${INSTALL_DIR}/${TARGET_NAME}"; then
-        # Check versions via kitchn-log if possible for pretty output, else plain
         log "Installed version: $("${INSTALL_DIR}/${TARGET_NAME}" --version 2>/dev/null || echo "unknown")"
     fi
 }

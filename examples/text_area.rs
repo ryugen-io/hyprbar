@@ -1,5 +1,4 @@
-use ks_lib::prelude::*;
-
+use hyprbar::prelude::*;
 
 pub struct TextArea {
     instance_name: Option<String>,
@@ -13,7 +12,7 @@ impl TextArea {
     }
 }
 
-impl Dish for TextArea {
+impl Widget for TextArea {
     fn name(&self) -> &str {
         "text_area"
     }
@@ -31,38 +30,49 @@ impl Dish for TextArea {
 
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, _dt: Duration) {
         let content = self.get_content(state);
-        
+
         Label::new(&content)
             .variant(TypographyVariant::Body)
-            .render(area, buf, state.cookbook.as_ref());
+            .render(area, buf, state.config_ink.as_ref());
     }
 }
 
 impl TextArea {
     fn get_content(&self, state: &BarState) -> String {
-        let base_config = state.config.dish.get("text_area").and_then(|v| v.as_table());
-        
-        // 1. Try instance config: [dish.text_area.alias].content
+        let base_config = state
+            .config
+            .widget
+            .get("text_area")
+            .and_then(|v| v.as_table());
+
+        // 1. Try instance config: [widget.text_area.alias].content
         if let Some(alias) = &self.instance_name {
             if let Some(content) = base_config
                 .and_then(|t| t.get(alias))
                 .and_then(|v| v.get("content"))
-                .and_then(|v| v.as_str()) 
+                .and_then(|v| v.as_str())
             {
                 return content.to_string();
             }
         }
 
-        // 2. Fallback to base config: [dish.text_area].content
+        // 2. Fallback to base config: [widget.text_area].content
         base_config
             .and_then(|t| t.get("content"))
             .and_then(|v| v.as_str())
-            .unwrap_or("Kitchn Sink")
+            .unwrap_or("hyprbar")
             .to_string()
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "Rust" fn _create_dish() -> Box<dyn Dish> {
+pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
     Box::new(TextArea::new())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {
+    static META: &[u8] =
+        b"{\"author\":\"\",\"description\":\"\",\"name\":\"Unknown\",\"version\":\"0.0.1\"}\0";
+    META.as_ptr() as *const _
 }
