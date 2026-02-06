@@ -15,6 +15,7 @@ struct InteractionState {
     click_count: u32,
     last_button: Option<u32>,
     scroll_offset: i32,
+    show_popup: bool,
 }
 
 impl InteractionDemoWidget {
@@ -25,6 +26,7 @@ impl InteractionDemoWidget {
                 click_count: 0,
                 last_button: None,
                 scroll_offset: 0,
+                show_popup: false,
             }),
         }
     }
@@ -52,6 +54,10 @@ impl Widget for InteractionDemoWidget {
             WidgetEvent::Click { button, .. } => {
                 state.click_count += 1;
                 state.last_button = Some(button);
+                // Toggle popup on left click
+                if button == 272 {
+                    state.show_popup = !state.show_popup;
+                }
             }
             WidgetEvent::Scroll { dy, .. } => {
                 state.scroll_offset += dy as i32;
@@ -108,9 +114,48 @@ impl Widget for InteractionDemoWidget {
             .variant(variant)
             .render(area, buf, state.config_ink.as_ref());
     }
+
+    fn popup_request(&self) -> Option<PopupRequest> {
+        let state = self.state.lock().unwrap();
+        if state.show_popup {
+            Some(PopupRequest::new(20, 5))
+        } else {
+            None
+        }
+    }
+
+    fn render_popup(&mut self, area: Rect, buf: &mut Buffer, state: &BarState) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
+        let interaction = self.state.lock().unwrap();
+
+        // Render popup content
+        let lines = [
+            format!("Clicks: {}", interaction.click_count),
+            format!("Scroll: {}", interaction.scroll_offset),
+            "Click to close".to_string(),
+        ];
+
+        for (i, line) in lines.iter().enumerate() {
+            if i as u16 >= area.height {
+                break;
+            }
+            let y = area.y + i as u16;
+            Label::new(line)
+                .variant(TypographyVariant::Body)
+                .render(Rect::new(area.x, y, area.width, 1), buf, state.config_ink.as_ref());
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
 pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
     Box::new(InteractionDemoWidget::new())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn _has_popup() -> bool {
+    true
 }

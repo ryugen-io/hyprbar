@@ -1,45 +1,41 @@
-# Kitchn Sink
+# hyprbar
 
-A versatile modular status bar and widget system for Wayland, powered by `kitchn` and `ratatui`.
+A modular Wayland status bar built with ratatui and smithay-client-toolkit.
 
 ## Features
-- **Dynamic Plugin System**: Load Rust-based plugins (`.dish`) at runtime.
-- **Flex-Grid Layout**: Modern layout engine with dynamic sizing and floating center.
-- **Deep Theming**: Integration with `kitchn` for unified system styling.
-- **Smart Scaling**: Pixel-perfect font scaling based on bar height.
+
+- **Dynamic Plugin System**: Load Rust-based widgets (.so) at runtime
+- **Flex-Grid Layout**: Modern layout engine with dynamic sizing
+- **Popup Support**: Widgets can display floating popups on hover/click
+- **Smart Scaling**: Pixel-perfect font scaling based on bar height
 
 ## Structure
 
 ```
-.
-├── crates/
-│   ├── ks-bin/      # Main Application
-│   ├── ks-lib/      # Core Library (Interfaces, Config, State)
-│   ├── ks-ui/       # UI Components (TUI widgets)
-│   └── ks-wayland/  # Wayland Integration (Layer Shell)
-├── examples/        # Plugin Examples
-└── tools/           # Dev tools (wash/load)
+src/
+├── bin/hyprbar.rs    # CLI entry point
+├── renderer/         # Rendering logic (modular)
+├── wayland/          # Wayland layer shell integration
+├── modules/          # Bootstrap, config, logging
+├── widget.rs         # Widget trait
+└── ...
 ```
 
-## Plugin System
+## Widget System
 
-Plugins are dynamic libraries (`.dish`) compiled from Rust code.
-They link against `ks-lib` and implement the `Dish` trait.
+Widgets are dynamic libraries (.so) implementing the `Widget` trait.
+Located in `~/.local/share/hyprbar/widgets/`.
 
-### Creating a Dish
+## Configuration
 
-See `examples/` for reference settings.
-Plugins must expose `_create_dish` symbol.
+Config file: `~/.config/hypr/hyprbar.conf` (TOML)
 
 ## Development
 
 ```bash
-# Build
-just build
-
-# Run (Debug)
-just run
-
-# Install
-just install
+just build      # Build
+just install    # Install
+just start      # Start daemon
+just stop       # Stop daemon
+just debug      # Debug mode with log terminal
 ```

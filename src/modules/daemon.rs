@@ -140,6 +140,12 @@ pub async fn restart_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result
 pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
     let socket_path = get_socket_path();
 
+    // Check if a debug viewer is already running for this socket
+    if is_debug_viewer_running(&socket_path) {
+        hyprlog::internal::debug("DAEMON", "Debug viewer already running, skipping spawn");
+        return Ok(());
+    }
+
     let terminal = env::var("TERMINAL").ok().or_else(|| {
         let terminals = ["rio", "alacritty", "kitty", "gnome-terminal", "xterm"];
         for term in terminals {
@@ -162,6 +168,8 @@ pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
             .stderr(Stdio::null())
             .spawn()
             .context("Failed to spawn debug terminal")?;
+
+        hyprlog::internal::info("DAEMON", "Debug viewer spawned");
     } else {
         let msg = config_ink
             .layout
@@ -173,4 +181,36 @@ pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn is_debug_viewer_running(socket_path: &std::path::Path) -> bool {
+    use std::fs;
+
+    let socket_str = socket_path.to_string_lossy();
+
+    // Check /proc for processes with internal-watch in cmdline
+    if let Ok(entries) = fs::read_dir("/proc") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(pid) = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|s| s.parse::<u32>().ok())
+            {
+                let cmdline_path = path.join("cmdline");
+                if let Ok(cmdline) = fs::read_to_string(&cmdline_path)
+                    && cmdline.contains("internal-watch")
+                    && cmdline.contains(&*socket_str)
+                {
+                    hyprlog::internal::debug(
+                        "DAEMON",
+                        &format!("Found existing viewer PID {}", pid),
+                    );
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }

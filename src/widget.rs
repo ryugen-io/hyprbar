@@ -8,15 +8,29 @@ pub struct PopupRequest {
     pub height: u16,
     pub offset_x: i16,
     pub offset_y: i16,
+    pub persist: bool, // true = stay open until toggled, false = close on leave
 }
 
 impl PopupRequest {
+    /// Create a popup that stays open until toggled (click mode)
     pub fn new(width: u16, height: u16) -> Self {
         Self {
             width,
             height,
             offset_x: 0,
-            offset_y: 4,
+            offset_y: 0,
+            persist: true,
+        }
+    }
+
+    /// Create a popup that closes when leaving the widget (hover mode)
+    pub fn hover(width: u16, height: u16) -> Self {
+        Self {
+            width,
+            height,
+            offset_x: 0,
+            offset_y: 0,
+            persist: false,
         }
     }
 }

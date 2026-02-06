@@ -8,7 +8,7 @@ use hyprbar::modules::cli::{Cli, Commands};
 use hyprbar::modules::config;
 use hyprbar::modules::daemon;
 use hyprbar::modules::install;
-use hyprbar::modules::logging::{self, log_info};
+use hyprbar::modules::logging::{self, *};
 use hyprbar::modules::runner;
 use hyprbar::modules::watcher;
 use hyprbar::tui;

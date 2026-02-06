@@ -11,7 +11,17 @@ pub struct BarConfig {
     #[serde(default)]
     pub logging: LoggingConfig,
     #[serde(default)]
+    pub popup: PopupConfig,
+    #[serde(default)]
     pub widget: std::collections::HashMap<String, toml::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct PopupConfig {
+    #[serde(default)]
+    pub offset_x: i16,
+    #[serde(default)]
+    pub offset_y: i16,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

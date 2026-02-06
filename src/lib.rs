@@ -20,7 +20,7 @@ pub mod prelude {
     pub use crate::ui::interaction::InteractionExt;
     pub use crate::ui::label::{Label, TypographyVariant};
     pub use crate::ui::style::ThemeExt;
-    pub use crate::widget::{Widget, WidgetProvider};
+    pub use crate::widget::{PopupRequest, Widget, WidgetProvider};
     pub use hyprink::config::Config;
     pub use hyprink::factory::ColorResolver;
     pub use ratatui::prelude::*;

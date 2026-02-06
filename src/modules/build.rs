@@ -193,8 +193,15 @@ pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {{
         return Err(anyhow::anyhow!("Artifact not found at {:?}", artifact_path));
     }
 
+    // Output to XDG data directory
+    let widgets_dir = dirs::data_local_dir()
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine XDG data directory"))?
+        .join("hyprbar/widgets");
+
+    fs::create_dir_all(&widgets_dir).await?;
+
     let output_name = format!("{}.so", widget_name);
-    let target_path = std::env::current_dir()?.join(&output_name);
+    let target_path = widgets_dir.join(&output_name);
     fs::copy(&artifact_path, &target_path).await?;
 
     hyprlog::internal::info(

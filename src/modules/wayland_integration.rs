@@ -1,10 +1,11 @@
 use crate::config::BarConfig;
 use crate::event::WidgetEvent;
-use crate::modules::logging::log_debug;
+use crate::modules::logging::*;
 use crate::renderer::BarRenderer;
 use crate::state::BarState;
 use crate::wayland::init as init_wayland;
 use crate::wayland::state::WaylandState;
+use crate::wayland::{create_popup_surface, destroy_popup_surface};
 use anyhow::{Context, Result};
 use smithay_client_toolkit::reexports::client::EventQueue;
 use smithay_client_toolkit::shell::wlr_layer::LayerSurface;
@@ -13,7 +14,8 @@ use std::time::Duration;
 pub async fn init_wayland_integration(
     config: &BarConfig,
 ) -> Result<(WaylandState, EventQueue<WaylandState>, LayerSurface)> {
-    // 6. Initialize Wayland & Smart Scaling
+    log_info("WAYLAND", "Initializing Wayland integration");
+
     let (font_size, window_height) = config.window.calculate_dimensions();
     log_debug(
         "WAYLAND",
@@ -24,10 +26,22 @@ pub async fn init_wayland_integration(
     );
 
     let monitor = if config.window.monitor.is_empty() {
+        log_debug("WAYLAND", "No monitor specified, using default");
         None
     } else {
+        log_info(
+            "WAYLAND",
+            &format!("Target monitor: {}", config.window.monitor),
+        );
         Some(config.window.monitor.clone())
     };
+
+    let anchor = if config.window.anchor == "bottom" {
+        "bottom"
+    } else {
+        "top"
+    };
+    log_debug("WAYLAND", &format!("Bar anchor: {}", anchor));
 
     init_wayland(
         window_height,
@@ -87,9 +101,10 @@ pub fn handle_wayland_events(
         }
     }
 
-    event_queue
-        .blocking_dispatch(wayland_state)
-        .context("Wayland dispatch failed")?;
+    if let Err(e) = event_queue.blocking_dispatch(wayland_state) {
+        log_error("WAYLAND", &format!("Dispatch failed: {}", e));
+        return Err(e).context("Wayland dispatch failed");
+    }
 
     // Process Input Events
     // We do this after dispatch to handle events received this turn
@@ -122,6 +137,9 @@ pub fn handle_wayland_events(
         }
     }
 
+    // Popup handling: check if widget wants a popup
+    handle_popup_lifecycle(wayland_state, &qh, renderer, bar_state, config)?;
+
     // Render again if input events triggered a redraw
     if wayland_state.configured && wayland_state.redraw_requested {
         renderer.render_frame(bar_state, Duration::from_millis(16))?;
@@ -135,6 +153,83 @@ pub fn handle_wayland_events(
                 .as_deref()
                 .unwrap_or(&config.style.bg),
         )?;
+    }
+
+    Ok(())
+}
+
+fn handle_popup_lifecycle(
+    wayland_state: &mut WaylandState,
+    qh: &smithay_client_toolkit::reexports::client::QueueHandle<WaylandState>,
+    renderer: &mut BarRenderer,
+    bar_state: &BarState,
+    config: &BarConfig,
+) -> Result<()> {
+    let char_w = wayland_state.text_renderer.char_width;
+    let char_h = wayland_state.text_renderer.char_height;
+    let anchor_bottom = config.window.anchor == "bottom";
+
+    // Check if hovered widget wants a popup
+    if let Some((request, popup_info)) = renderer.check_popup_request() {
+        // Check if we already have this popup active
+        let needs_create = match renderer.active_popup() {
+            Some(active) => {
+                active.section != popup_info.section || active.index != popup_info.index
+            }
+            None => true,
+        };
+
+        if needs_create {
+            // Calculate popup position in pixels
+            // Widget left edge in pixels
+            let widget_left_px = popup_info.widget_area.x as i32 * char_w as i32;
+
+            let popup_width_px = request.width as u32 * char_w as u32;
+            let popup_height_px = request.height as u32 * char_h as u32;
+
+            // Base position: widget left edge + offsets
+            // offset 0,0 = popup starts at widget's left edge
+            let popup_x = widget_left_px + request.offset_x as i32 + config.popup.offset_x as i32;
+            let popup_y = request.offset_y as i32 + config.popup.offset_y as i32;
+
+            log_debug(
+                "POPUP",
+                &format!(
+                    "Creating at ({}, {}) - config offset: ({}, {})",
+                    popup_x, popup_y, config.popup.offset_x, config.popup.offset_y
+                ),
+            );
+
+            // Create the popup surface
+            create_popup_surface(
+                wayland_state,
+                qh,
+                popup_width_px,
+                popup_height_px,
+                popup_x,
+                popup_y,
+                anchor_bottom,
+            )?;
+
+            // Update renderer state
+            renderer.set_active_popup(popup_info, request.width, request.height);
+        }
+    } else {
+        // No popup wanted, destroy if active
+        if renderer.active_popup().is_some() {
+            log_debug("POPUP", "Widget no longer requests popup, destroying");
+            destroy_popup_surface(wayland_state);
+            renderer.clear_active_popup();
+        }
+    }
+
+    // Render popup if configured
+    if wayland_state.popup_configured
+        && wayland_state.popup_redraw_requested
+        && let Some(buf) = renderer.render_popup(bar_state)
+    {
+        let bg = config.style.popup_bg.as_deref().unwrap_or(&config.style.bg);
+        wayland_state.draw_popup(qh, buf, &bar_state.config_ink, bg)?;
     }
 
     Ok(())

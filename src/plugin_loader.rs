@@ -1,5 +1,7 @@
-use crate::widget::Widget;
+use crate::widget::{PopupRequest, Widget};
 use libloading::{Library, Symbol};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -8,9 +10,64 @@ type WidgetCreator = unsafe extern "Rust" fn() -> Box<dyn Widget>;
 
 use crate::modules::registry::Registry;
 
+/// Wraps a plugin-loaded widget to safely intercept popup methods.
+/// Popup calls through the Rust vtable across .so boundaries are unreliable
+/// (unstable ABI), so we only forward them if the plugin explicitly exports
+/// `_has_popup() -> true` via the stable C ABI.
+struct PluginWidget {
+    inner: Box<dyn Widget>,
+    has_popup: bool,
+}
+
+impl Widget for PluginWidget {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn render(
+        &mut self,
+        area: Rect,
+        buf: &mut Buffer,
+        state: &crate::state::BarState,
+        dt: std::time::Duration,
+    ) {
+        self.inner.render(area, buf, state, dt);
+    }
+
+    fn update(&mut self, dt: std::time::Duration, state: &crate::state::BarState) {
+        self.inner.update(dt, state);
+    }
+
+    fn width(&self, state: &crate::state::BarState) -> u16 {
+        self.inner.width(state)
+    }
+
+    fn set_instance_config(&mut self, name: String) {
+        self.inner.set_instance_config(name);
+    }
+
+    fn handle_event(&mut self, event: crate::event::WidgetEvent) {
+        self.inner.handle_event(event);
+    }
+
+    fn popup_request(&self) -> Option<PopupRequest> {
+        if !self.has_popup {
+            return None;
+        }
+        self.inner.popup_request()
+    }
+
+    fn render_popup(&mut self, area: Rect, buf: &mut Buffer, state: &crate::state::BarState) {
+        if !self.has_popup {
+            return;
+        }
+        self.inner.render_popup(area, buf, state);
+    }
+}
+
 pub struct PluginManager {
-    libraries: Vec<Library>, // Keep libs loaded
-    creators: HashMap<String, WidgetCreator>,
+    libraries: Vec<Library>,                          // Keep libs loaded
+    creators: HashMap<String, (WidgetCreator, bool)>, // (creator, has_popup)
     pub registry: Registry,
 }
 
@@ -94,6 +151,12 @@ impl PluginManager {
 
             let func: Symbol<WidgetCreator> = lib.get(b"_create_widget")?;
 
+            // Check if plugin explicitly declares popup support (stable C ABI)
+            let has_popup = lib
+                .get::<extern "C" fn() -> bool>(b"_has_popup")
+                .map(|f| f())
+                .unwrap_or(false);
+
             // Invoke once to get the widget name (internal name, not filename)
             // Note: Registry uses filename as key currently.
             // This might cause mismatch if filename != widget name.
@@ -106,7 +169,7 @@ impl PluginManager {
             let func_ptr = *func;
 
             self.libraries.push(lib);
-            self.creators.insert(name.clone(), func_ptr);
+            self.creators.insert(name.clone(), (func_ptr, has_popup));
         }
         Ok(())
     }
@@ -114,9 +177,10 @@ impl PluginManager {
 
 impl crate::widget::WidgetProvider for PluginManager {
     fn create_widget(&self, name: &str) -> Option<Box<dyn Widget>> {
-        if let Some(creator) = self.creators.get(name) {
+        if let Some(&(creator, has_popup)) = self.creators.get(name) {
             unsafe {
-                return Some(creator());
+                let inner = creator();
+                return Some(Box::new(PluginWidget { inner, has_popup }));
             }
         }
         None
