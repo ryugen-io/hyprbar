@@ -11,21 +11,21 @@ use ratatui::{
 pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
 
-    // 1. Background
+    // Full-area background prevents transparent gaps between widgets.
     let bg_color = resolve_color(&app.config, "bg");
     let fg_color = resolve_color(&app.config, "fg");
 
     let block = Block::default().style(Style::default().bg(bg_color).fg(fg_color));
     f.render_widget(block, size);
 
-    // 2. Layout (Header, Content, Footer)
+    // Three-row layout keeps navigation controls visible regardless of content height.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
         .constraints([
-            Constraint::Length(3), // Header
-            Constraint::Min(0),    // Content
-            Constraint::Length(3), // Footer
+            Constraint::Length(3), // Title bar — fixed height keeps it visible during scrolling.
+            Constraint::Min(0),    // Menu list fills remaining space so all items are reachable.
+            Constraint::Length(3), // Keybinding hints — always visible at the bottom.
         ])
         .split(size);
 
@@ -50,7 +50,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
     let accent = resolve_color(&app.config, "accent");
     let fg = resolve_color(&app.config, "fg");
 
-    // Status Indicator
+    // Daemon status shown prominently so users know if the bar is running.
     let status_text = if app.running {
         Span::styled(
             "● ACTIVE",
@@ -63,12 +63,12 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         )
     };
 
-    // Split content area for Status + List
+    // Status needs fixed height; list gets remaining space to show all items.
     let content_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2), // Status
-            Constraint::Min(0),    // List
+            Constraint::Length(2), // Status line needs exactly 2 rows for the indicator + spacing.
+            Constraint::Min(0),    // Menu items expand to fill — avoids dead space below short lists.
         ])
         .split(area);
 
@@ -76,7 +76,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         .alignment(Alignment::Center);
     f.render_widget(status_para, content_chunks[0]);
 
-    // Menu List
+    // ratatui's List handles keyboard navigation and selection state automatically.
     let items: Vec<ListItem> = app
         .items
         .iter()
@@ -90,7 +90,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         .block(Block::default().borders(Borders::NONE))
         .highlight_style(
             Style::default()
-                .fg(bg_color(&app.config)) // Invert for highlight
+                .fg(bg_color(&app.config)) // Inverted fg/bg makes the selected row stand out against the list.
                 .bg(accent)
                 .add_modifier(Modifier::BOLD),
         )
@@ -108,7 +108,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(keys, area);
 }
 
-// Helper to resolve colors from config
+// Config may override any color; fall through to hardcoded defaults for missing keys.
 fn resolve_color(config: &BarConfig, key: &str) -> Color {
     match key {
         "bg" => parse_hex(&config.style.bg),
@@ -155,8 +155,7 @@ fn parse_hex(val: &str) -> Color {
     Color::Reset
 }
 
-// Fallbacks for specific purposes
-// Fallbacks for specific purposes
+// Wrapper needed because highlight_style inverts fg/bg for the selected row.
 fn bg_color(config: &BarConfig) -> Color {
     resolve_color(config, "bg")
 }

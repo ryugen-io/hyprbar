@@ -6,9 +6,9 @@ use tokio::io::AsyncReadExt;
 use tokio::net::UnixStream;
 
 pub async fn run_watcher(socket_path: &Path) -> Result<()> {
-    // Retry connection loop
+    // Outer loop reconnects when the daemon restarts.
     loop {
-        // Connection loop
+        // Daemon may not be running yet — busy-wait until its socket appears.
         let mut stream = loop {
             match UnixStream::connect(socket_path).await {
                 Ok(s) => break s,
@@ -21,10 +21,9 @@ pub async fn run_watcher(socket_path: &Path) -> Result<()> {
 
         let mut buf = [0u8; 4096];
         loop {
-            // Read loop
             match stream.read(&mut buf).await {
                 Ok(0) => {
-                    // EOF - Server restart?
+                    // EOF means daemon died or restarted — break to reconnect.
                     break;
                 }
                 Ok(n) => {
@@ -38,7 +37,7 @@ pub async fn run_watcher(socket_path: &Path) -> Result<()> {
             }
         }
 
-        // Wait before reconnecting
+        // Back off to avoid busy-looping if the daemon is slow to restart.
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 }

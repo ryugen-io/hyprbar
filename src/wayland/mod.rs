@@ -112,8 +112,8 @@ pub fn init(
 
 use smithay_client_toolkit::reexports::client::QueueHandle;
 
-/// Creates a popup surface for displaying widget popups.
-/// Position is relative to screen, typically calculated from widget position.
+/// Wayland requires a separate layer surface for popups because layer-shell
+/// doesn't support subsurfaces — each popup must be its own toplevel overlay.
 pub fn create_popup_surface(
     state: &mut WaylandState,
     qh: &QueueHandle<WaylandState>,
@@ -123,17 +123,15 @@ pub fn create_popup_surface(
     y: i32,
     anchor_bottom: bool,
 ) -> Result<()> {
-    // Destroy existing popup if any
+    // Old popup must be torn down first — only one popup at a time.
     destroy_popup_surface(state);
 
-    // Create popup pool
     let popup_pool = SlotPool::new((width * height * 4) as usize, &state.shm)
         .context("Failed to create popup pool")?;
 
-    // Create popup surface
     let popup_wl_surface = state.compositor_state.create_surface(qh);
 
-    // Create layer surface for popup (Overlay layer = above everything)
+    // Overlay layer ensures popup renders above the bar and other windows.
     let popup_layer = state.layer_shell.create_layer_surface(
         qh,
         popup_wl_surface.clone(),
@@ -142,7 +140,7 @@ pub fn create_popup_surface(
         None, // Same output as main surface
     );
 
-    // Configure popup anchoring and margins
+    // Anchor matches bar position so the popup appears adjacent to the bar edge.
     let anchor = if anchor_bottom {
         Anchor::BOTTOM | Anchor::LEFT
     } else {
@@ -171,16 +169,15 @@ pub fn create_popup_surface(
     Ok(())
 }
 
-/// Destroys the current popup surface if it exists.
+/// Cleanup prevents leaked Wayland objects and frees the shared-memory pool.
 pub fn destroy_popup_surface(state: &mut WaylandState) {
     if state.popup_layer.is_some() {
         hyprlog::internal::debug("POPUP", "Destroying popup surface");
     }
 
-    // Drop layer surface first (this also destroys the underlying protocol object)
+    // Layer surface must drop before the wl_surface — Wayland protocol requires child objects to be destroyed first.
     state.popup_layer = None;
 
-    // Then destroy the wl_surface
     if let Some(surface) = state.popup_surface.take() {
         surface.destroy();
     }

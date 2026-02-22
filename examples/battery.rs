@@ -13,7 +13,7 @@ pub struct BatteryWidget {
     last_update: Duration,
     battery_path: Option<std::path::PathBuf>,
     instance_name: Option<String>,
-    // Effects wrapped in Mutex for Sync
+    // Widget trait requires Sync, but Effect is not Sync on its own.
     effect: Mutex<Option<Effect>>,
     last_state: BatteryState,
 }
@@ -30,7 +30,7 @@ impl BatteryWidget {
         let battery_path = Self::find_battery();
         let (percent, charging) = Self::read_battery(&battery_path);
 
-        // Initial state logic matches update_effect
+        // Must match update_effect's classification so the first frame doesn't trigger a spurious state change.
         let initial_state = if charging {
             BatteryState::Charging
         } else if percent <= 20 {
@@ -67,8 +67,7 @@ impl BatteryWidget {
         if current_state != self.last_state || effect_is_none {
             self.last_state = current_state;
 
-            // Resolve accent color for "shine"
-            // DIRECT RESOLUTION: Try config first to ensure sink.toml is respected
+            // Config overrides take priority over theme defaults so per-bar sink.toml is respected.
             let accent = if let Some(hex) = &state.config.style.accent {
                 let c = ColorResolver::hex_to_color(hex);
                 Color::Rgb(c.r, c.g, c.b)
@@ -80,13 +79,11 @@ impl BatteryWidget {
 
             *self.effect.lock().unwrap() = match current_state {
                 BatteryState::Charging => {
-                    // Visor-like sweep (Accent color)
-                    // Visor-like sweep (Accent color) - FG only to prevent bg bleed
-                    // Using fade_to_fg ensuring the "wave" is the accent color
+                    // FG-only fade prevents background color from bleeding into adjacent cells.
                     Some(fx::fade_to_fg(accent, 1500).with_pattern(SweepPattern::left_to_right(4)))
                 }
                 BatteryState::Low => {
-                    // Breathing (Red/Error)
+                    // Pulsing draws the user's eye without being as jarring as a static alert.
                     Some(fx::ping_pong(fx::fade_from(
                         low_color,
                         Color::Reset,
@@ -153,10 +150,10 @@ impl Widget for BatteryWidget {
             self.charging = charging;
             self.last_update = Duration::from_secs(0);
 
-            // Re-evaluate state
+            // Battery state may have changed — update effect to match new charge/charging level.
             self.update_effect(_state);
         } else {
-            // Ensure effect is initialized if it's missing (e.g. on first run)
+            // Constructor can't create effects (no BarState yet), so first update must initialize.
             if self.effect.lock().unwrap().is_none() && self.charging {
                 self.update_effect(_state);
             }
@@ -168,7 +165,7 @@ impl Widget for BatteryWidget {
             return;
         }
 
-        // --- Render Base Content ---
+        // Colors and config must be resolved before any drawing so themed overrides apply everywhere.
         let fg_color = Some(state.config_ink.resolve_color("fg"));
         let bg_color = Some(state.config_ink.resolve_bg("bg"));
         let accent_color = Some(state.config_ink.resolve_color("accent"));
@@ -236,7 +233,7 @@ impl Widget for BatteryWidget {
         let mut x = area.x;
         let y = area.y;
 
-        // Draw Content
+        // Manual cell-by-cell writing because ratatui's Paragraph widget doesn't support mixed per-char colors.
         for ch in icon.chars() {
             if x >= area.right() {
                 break;
@@ -303,28 +300,24 @@ impl Widget for BatteryWidget {
             x += 1;
         }
 
-        // --- Effects ---
+        // Effects are applied post-render so they composite on top of the already-drawn content.
         let mut effect_lock = self.effect.lock().unwrap();
         if let Some(effect) = effect_lock.as_mut() {
-            // Calculate the specific area for the bar (charging blocks)
-            // Icon width is 1 + 1 space if charging, else 0
+            // Effect must only cover the filled bar blocks — animating the icon or percentage looks wrong.
             let icon_offset = if self.charging { 2 } else { 0 };
-            // Limit width to filled blocks only
-            let visible_width = if filled > 0 { filled } else { 1 }; // Ensure at least 1 width if filled is 0 but state implies we should draw?
-            // Actually if filled is 0, we probably shouldn't animate, but 'filled' can be 0 at 0%.
+            let visible_width = if filled > 0 { filled } else { 1 };
 
             let bar_area = Rect::new(area.x + icon_offset, area.y, visible_width as u16, 1);
 
-            // Only apply effect to the bar area, not the icon or percentage
-            // We need to ensure the rect is within bounds and valid
+            // Bounds check prevents painting outside our allocated area into adjacent widgets.
             if bar_area.right() <= area.right() && filled > 0 {
                 effect.process(dt, buf, bar_area);
             }
 
-            // Auto-Loop
+            // tachyonfx effects are one-shot — restart a fresh instance to keep the animation looping.
             if effect.done() {
                 let current_state = self.last_state;
-                // Resolve colors again for the loop
+                // Colors may have changed (e.g. theme hot-reload) since the previous loop iteration.
                 let accent = if let Some(hex) = &state.config.style.accent {
                     let c = ColorResolver::hex_to_color(hex);
                     Color::Rgb(c.r, c.g, c.b)

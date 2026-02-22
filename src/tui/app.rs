@@ -96,10 +96,8 @@ impl App {
 
         let found = self.sys.processes().values().find(|p| {
             let name = p.name();
-            // Filter zombie processes (status 4 seems to be Zombie in some versions, but let's use the update)
-            // sysinfo 0.37 usages: p.status() returns ProcessStatus
             let status = p.status();
-            // Filter out Zombies (essential because we are the parent and might not have reaped them)
+            // We spawn child processes — zombies linger until reaped and would give false "running" positives.
             if matches!(status, sysinfo::ProcessStatus::Zombie) {
                 return false;
             }
@@ -123,7 +121,7 @@ impl App {
         match action {
             MenuAction::ToggleService => {
                 if self.running {
-                    // Use CLI stop command
+                    // Delegate to CLI so signal handling and PID cleanup stay consistent.
                     Command::new(&self_exe)
                         .arg("--stop")
                         .stdout(Stdio::null())
@@ -131,7 +129,6 @@ impl App {
                         .spawn()?
                         .wait()?;
                 } else {
-                    // Use CLI start command
                     Command::new(&self_exe)
                         .arg("--start")
                         .stdout(Stdio::null())
@@ -144,17 +141,15 @@ impl App {
                 Ok(false)
             }
             MenuAction::EditConfig => {
-                // 1. Resolve Editor
                 let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
 
-                // 2. Resolve Config Path
                 let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
                 let config_path = std::path::PathBuf::from(home)
                     .join(".config")
                     .join("hyprbar")
                     .join("hyprbar.toml");
 
-                // 3. Detect Terminal
+                // $TERMINAL is preferred; fall back to probing common emulators.
                 let terminal = std::env::var("TERMINAL").ok().or_else(|| {
                     let terminals = ["rio", "alacritty", "kitty", "gnome-terminal", "xterm"];
                     for term in terminals {
@@ -165,7 +160,6 @@ impl App {
                     None
                 });
 
-                // 4. Spawn
                 if let Some(term) = terminal {
                     Command::new(term)
                         .arg("-e")

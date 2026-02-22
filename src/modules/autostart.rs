@@ -12,7 +12,7 @@ pub fn handle_autostart(config_ink: &Arc<Config>) -> Result<()> {
     let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let config_dir = PathBuf::from(home).join(".config").join("hyprbar");
 
-    // Ensure config dir exists
+    // First-run: config dir may not exist yet and we need it for the autostart script.
     if !config_dir.exists() {
         fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
     }
@@ -33,7 +33,7 @@ pub fn handle_autostart(config_ink: &Arc<Config>) -> Result<()> {
         hyprlog::internal::info("AUTOSTART", &msg);
     } else {
         debug!("Autostart script does not exist. Creating...");
-        // Simple shell script to start the daemon
+        // Shell script is the standard Hyprland exec-once integration point.
         let content = "#!/bin/sh\n# Hyprbar Autostart\n# Add this script to your window manager's startup\n\nhyprbar --start\n";
         fs::write(&script_path, content).context("Failed to write autostart script")?;
 
@@ -49,7 +49,7 @@ pub fn handle_autostart(config_ink: &Arc<Config>) -> Result<()> {
             .unwrap_or_else(|| "autostart script created".to_string());
         hyprlog::internal::info("AUTOSTART", &msg);
 
-        // Help message
+        // Users need the path and example config line to wire up their WM.
         hyprlog::internal::info("AUTOSTART", &format!("Script location: {:?}", script_path));
         hyprlog::internal::info(
             "AUTOSTART",

@@ -159,11 +159,10 @@ impl OutputHandler for WaylandState {
 
 impl LayerShellHandler for WaylandState {
     fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, layer: &LayerSurface) {
-        // Check if it's the popup or main surface
+        // Popup and main share this handler — discriminate by surface identity.
         if let Some(popup_layer) = &self.popup_layer
             && popup_layer.wl_surface() == layer.wl_surface()
         {
-            // Popup was closed externally
             hyprlog::internal::debug("POPUP", "Popup closed externally");
             self.popup_layer = None;
             self.popup_surface = None;
@@ -171,7 +170,7 @@ impl LayerShellHandler for WaylandState {
             self.popup_configured = false;
             return;
         }
-        // Main surface closed
+        // If not the popup, the main surface was closed — time to exit.
         self.exit = true;
     }
 
@@ -183,11 +182,10 @@ impl LayerShellHandler for WaylandState {
         configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        // Check if it's the popup or main surface
+        // Popup and main share this handler — discriminate by surface identity.
         if let Some(popup_layer) = &self.popup_layer
             && popup_layer.wl_surface() == layer.wl_surface()
         {
-            // Popup configured
             if configure.new_size.0 != 0 && configure.new_size.1 != 0 {
                 self.popup_width = configure.new_size.0;
                 self.popup_height = configure.new_size.1;
@@ -203,7 +201,6 @@ impl LayerShellHandler for WaylandState {
             );
             return;
         }
-        // Main surface configured
         if configure.new_size.0 != 0 && configure.new_size.1 != 0 {
             self.width = configure.new_size.0;
             self.height = configure.new_size.1;
@@ -232,7 +229,7 @@ impl SeatHandler for WaylandState {
         capability: Capability,
     ) {
         if capability == Capability::Pointer && self.seat_state.get_pointer(qh, &seat).is_ok() {
-            hyprlog::internal::debug("WAYLAND", "Got pointer capability");
+            hyprlog::internal::debug("WAYLAND", "Pointer capability acquired");
         }
     }
     fn remove_capability(

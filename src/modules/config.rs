@@ -27,7 +27,7 @@ pub fn load_bar_config(_config_ink: &Config) -> BarConfig {
         }
     }
 
-    // Fallback
+    // Missing or broken config shouldn't prevent the bar from starting — use sensible defaults.
     BarConfig::default()
 }
 
@@ -38,7 +38,7 @@ fn load_recursive_config(path: &Path, base_dir: &Path) -> Result<Value> {
     let mut root_value: Value =
         toml::from_str(&content).with_context(|| format!("Failed to parse TOML in {:?}", path))?;
 
-    // Check for "include" key and collect paths
+    // Includes must be collected before mutation so we don't borrow root_value while modifying it.
     let mut include_patterns = Vec::new();
     if let Some(includes) = root_value.get("include").and_then(|v| v.as_array()) {
         for include_val in includes {
@@ -48,12 +48,11 @@ fn load_recursive_config(path: &Path, base_dir: &Path) -> Result<Value> {
         }
     }
 
-    // Expand globs and merge
+    // Hyprland-style includes support globs, so each pattern may resolve to multiple files.
     for pattern_str in include_patterns {
         let pattern_path = base_dir.join(&pattern_str);
 
-        // If it looks like a glob (or just a path), try globbing it
-        // We use pattern_path.to_string_lossy() because glob::glob expects a string pattern
+        // glob::glob requires &str, but Path gives OsStr — lossy conversion is acceptable since config paths are always UTF-8.
         let pattern = pattern_path.to_string_lossy();
 
         match glob::glob(&pattern) {
@@ -63,7 +62,7 @@ fn load_recursive_config(path: &Path, base_dir: &Path) -> Result<Value> {
                     match entry {
                         Ok(path) => {
                             found_any = true;
-                            // Recursively load the included file
+                            // Included files may themselves contain includes — recursion mirrors Hyprland's source directive.
                             let included_value = load_recursive_config(&path, base_dir)?;
                             merge_toml_values(&mut root_value, included_value);
                         }
@@ -101,9 +100,9 @@ fn merge_toml_values(base: &mut Value, other: Value) {
             for (k, v) in other_map {
                 match base_map.get_mut(&k) {
                     Some(base_val) => {
-                        // Warn on duplicate keys (except 'include' which we processed, or specific merges)
+                        // "include" is consumed above; "dish" keys are widget instances that legitimately overlap across files.
                         if k != "include" && !k.starts_with("dish") {
-                            // Suppress warning for tables that we are about to merge deeply
+                            // Tables merge recursively — warning on table overlap would be noisy and misleading.
                             if !base_val.is_table() || !v.is_table() {
                                 hyprlog::internal::warn(
                                     "CONFIG",

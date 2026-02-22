@@ -15,7 +15,7 @@ pub fn blit_buffer_to_pixels(
     text_renderer: &mut TextRenderer, // Mutable for SwashCache/FontSystem
     bg_color_hex: &str,
 ) {
-    // 1. Fill background (same as before)
+    // Entire framebuffer starts as the configured background — widgets paint on top.
     let default_bg_color = ColorResolver::hex_to_color(bg_color_hex);
     let (bg_r, bg_g, bg_b) = (default_bg_color.r, default_bg_color.g, default_bg_color.b);
 
@@ -42,7 +42,7 @@ pub fn blit_buffer_to_pixels(
     let fb_width = width as usize;
     let fb_height = height as usize;
 
-    // 2. Iterate by ROW to find contiguous text runs
+    // Batching same-styled cells into runs reduces shaping/rasterization calls.
     for y_cell in 0..grid_height {
         let mut current_run = String::new();
         let mut current_fg = Color::Reset;
@@ -57,7 +57,6 @@ pub fn blit_buffer_to_pixels(
             let cell_bg = cell.bg;
             let symbol = cell.symbol();
 
-            // Check if we should break the run
             if current_run.is_empty() {
                 current_run.push_str(symbol);
                 current_fg = cell_fg;
@@ -66,7 +65,7 @@ pub fn blit_buffer_to_pixels(
             } else if cell_fg == current_fg && cell_bg == current_bg {
                 current_run.push_str(symbol);
             } else {
-                // Style mismatch, flush current run
+                // Style changed — flush the accumulated run before starting a new one.
                 flush_run(
                     &current_run,
                     run_start_x,
@@ -87,7 +86,6 @@ pub fn blit_buffer_to_pixels(
                     bg_b,
                 );
 
-                // Start new run
                 current_run.clear();
                 current_run.push_str(symbol);
                 current_fg = cell_fg;
@@ -96,7 +94,7 @@ pub fn blit_buffer_to_pixels(
             }
         }
 
-        // Flush end of row
+        // Row boundary — flush whatever remains so nothing is silently dropped.
         if !current_run.is_empty() {
             flush_run(
                 &current_run,
@@ -144,15 +142,11 @@ fn flush_run(
     let resolved_fg = resolve_color(fg, config_ink, Color::White);
     let resolved_bg = resolve_color(bg, config_ink, Color::Reset); // Reset means transparent/default
 
-    /* debug!(
-        "Flush run: '{}' (fg={:?}->{:?}, bg={:?}->{:?})",
-        text, fg, resolved_fg, bg, resolved_bg
-    ); */
+    // Color resolution can silently fall through to defaults — enable tracing to diagnose theme mismatches.
 
-    // Draw Background rect
+    // Background must be painted before text so glyphs composite on top.
     if bg != Color::Reset {
         let (br, bg, bb) = color_to_rgb(resolved_bg);
-        // Correctly use the passed width in cells
         let run_width_cells = width_in_cells;
 
         let rect_x = start_x_cell * char_w;
@@ -179,18 +173,17 @@ fn flush_run(
         }
     }
 
-    // Draw Text with Cosmic Text
+    // cosmic-text handles shaping and rasterization for Unicode correctness.
     let font_size = text_renderer.font_size;
     let line_height = font_size * 1.2;
 
-    // debug!("Flush run: '{}' (bg={:?}) Cells: {} ", text, bg, width_in_cells);
+    // Per-run shaping is expensive — if text looks wrong, check that runs aren't splitting mid-grapheme.
 
     let mut buffer = Buffer::new(
         &mut text_renderer.font_system,
         Metrics::new(font_size, line_height),
     );
 
-    // Shape text
     buffer.set_text(
         &mut text_renderer.font_system,
         text,
@@ -200,11 +193,9 @@ fn flush_run(
     );
     buffer.shape_until_scroll(&mut text_renderer.font_system, false);
 
-    // Rasterize
     let (fr, fg, fb) = color_to_rgb(resolved_fg);
     let cosmic_color = CosmicColor::rgb(fr, fg, fb);
 
-    // Run callback
     let draw_x_base = (start_x_cell * char_w) as i32;
     let draw_y_base = (start_y_offset + y_cell * char_h) as i32;
     #[allow(clippy::unnecessary_cast)]
@@ -255,12 +246,11 @@ fn flush_run(
     );
 }
 
-// Helpers
 fn resolve_color(c: Color, config_ink: &Config, default: Color) -> Color {
     match c {
         Color::Reset => {
             if default == Color::White {
-                // Try looking up 'fg' from theme
+                // Reset means "use theme default", not literal black.
                 config_ink
                     .theme
                     .colors

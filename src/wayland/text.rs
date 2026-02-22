@@ -17,10 +17,10 @@ impl TextRenderer {
     pub fn new(font_path: Option<&str>, font_size: f32) -> Result<Self> {
         let swash_cache = SwashCache::new();
 
-        // Store the requested family name (or default to "Monospace")
+        // cosmic-text resolves fonts by family name, not path — store the name for later use.
         let font_family = font_path.unwrap_or("Monospace").to_string();
 
-        // 1. Determine which font to load
+        // fc-match resolves logical names to file paths; direct paths bypass it.
         let font_to_load = if let Some(path_str) = font_path {
             hyprlog::internal::debug("FONT", &format!("Requesting user font: {}", path_str));
             let path = PathBuf::from(path_str);
@@ -40,19 +40,19 @@ impl TextRenderer {
                         path_str
                     ),
                 );
-                // Try to resolve monospace as fallback
+                // Monospace fallback keeps the grid usable even with a bad font config.
                 resolve_font_via_fc_match("monospace").map(PathBuf::from)
             }
         } else {
-            // No font specified - resolve system monospace
+            // Monospace is the safest default for a terminal-style grid layout.
             hyprlog::internal::debug("FONT", "No font specified, resolving system monospace");
             resolve_font_via_fc_match("monospace").map(PathBuf::from)
         };
 
-        // 2. Initialize FontSystem with EMPTY database to avoid scanning system fonts (slow!)
+        // Empty database avoids scanning all system fonts (slow on large font collections).
         let mut db = Database::new();
 
-        // Load the specific font file if found
+        // Font data must be loaded into the database before cosmic-text can use it.
         if let Some(path) = font_to_load {
             if let Ok(data) = std::fs::read(&path) {
                 db.load_font_source(Source::Binary(std::sync::Arc::new(data)));
@@ -66,10 +66,10 @@ impl TextRenderer {
 
         let mut font_system = FontSystem::new_with_locale_and_db("en-US".into(), db);
 
-        // 3. Setup Metrics (Fixed Grid)
+        // Fixed grid requires consistent cell dimensions across all characters.
         let line_height = font_size * 1.2;
 
-        // Create a dummy buffer to measure 'M' width for grid size
+        // 'M' is the widest common glyph — measuring it gives reliable monospace cell width.
         let mut buffer = Buffer::new(&mut font_system, Metrics::new(font_size, line_height));
 
         // We set a default family to ensure we measure something reasonable.
@@ -91,7 +91,7 @@ impl TextRenderer {
             (font_size * 0.6) as usize // Fallback
         };
 
-        // Ensure at least 1px
+        // Zero-width cells would cause division-by-zero in grid coordinate calculations.
         let char_width = char_width.max(1);
         let char_height = line_height.ceil() as usize;
 
@@ -103,7 +103,7 @@ impl TextRenderer {
             ),
         );
 
-        // Debug loaded faces
+        // Log loaded faces to help diagnose font-not-found issues.
         for face in font_system.db().faces() {
             hyprlog::internal::debug(
                 "FONT",
@@ -126,7 +126,7 @@ impl TextRenderer {
 }
 
 fn resolve_font_via_fc_match(font_name: &str) -> Option<String> {
-    // Run: fc-match --format=%{file} "font_name"
+    // fontconfig's fc-match resolves logical names (like "monospace") to file paths.
     match Command::new("fc-match")
         .arg("--format=%{file}")
         .arg(font_name)

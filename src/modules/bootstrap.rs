@@ -15,7 +15,8 @@ pub async fn init_application(
 ) -> Result<(Arc<Config>, BarConfig, BarState, PluginManager, BarRenderer)> {
     log_debug("BOOTSTRAP", "Starting application initialization");
 
-    // Pre-fetch log strings (Config consumed later)
+    // Config labels are fetched now because the Arc is shared and the signal task
+    // needs owned Strings — can't borrow from config_ink across the spawn boundary.
     let get_msg = |key: &str, default: &str| -> String {
         config_ink
             .layout
@@ -30,7 +31,7 @@ pub async fn init_application(
 
     log_debug("BOOTSTRAP", "Signal handlers configured");
 
-    // Spawn Signal Handler
+    // Brief delay before exit gives in-flight Wayland frames time to finish rendering.
     let _signal_config_ink = config_ink.clone();
     tokio::spawn(async move {
         let mut term = signal(SignalKind::terminate()).unwrap();
@@ -45,15 +46,13 @@ pub async fn init_application(
         std::process::exit(0);
     });
 
-    // Initialize Bar State (now simpler)
     log_debug("BOOTSTRAP", "Initializing bar state");
     let bar_state = BarState::new(config_ink.clone(), config.clone());
 
-    // Initialize Plugin Manager
     log_debug("PLUGINS", "Initializing plugin manager");
     let mut plugin_manager = PluginManager::new();
 
-    // Load plugins from ~/.local/share/hyprbar/widgets
+    // XDG data dir is the canonical location for user-installed widget .so files.
     if let Some(data_dir) = dirs::data_local_dir() {
         let widgets_dir = data_dir.join("hyprbar/widgets");
         log_debug(
@@ -88,10 +87,9 @@ pub async fn init_application(
         log_error("PLUGINS", "Cannot determine local data directory");
     }
 
-    // Initialize Renderer
     log_debug("RENDER", "Initializing renderer");
     let renderer = BarRenderer::new(
-        100, // TODO: This needs to be dynamic based on screen width
+        100, // Placeholder — real width arrives in the first Wayland configure event.
         config.window.height as u16,
         &config,
         &bar_state.config_ink,

@@ -27,7 +27,7 @@ pub struct WaylandState {
     pub pool: SlotPool,
     pub redraw_requested: bool,
 
-    // Application state
+    // Core surface lifecycle — separate from toolkit state because Wayland requires explicit tracking.
     pub exit: bool,
     pub surface: Option<WlSurface>,
     pub configured: bool,
@@ -39,7 +39,7 @@ pub struct WaylandState {
     pub cursor_x: f64,
     pub cursor_y: f64,
 
-    // Popup state
+    // Popup needs its own surface + pool because layer-shell doesn't support subsurfaces.
     pub popup_surface: Option<WlSurface>,
     pub popup_layer: Option<LayerSurface>,
     pub popup_pool: Option<SlotPool>,
@@ -71,7 +71,7 @@ impl WaylandState {
 
         let stride = width as i32 * 4;
 
-        // Create buffer
+        // Shared-memory buffer is the only way to pass pixels to Wayland compositors.
         let (wl_buffer, canvas) = self
             .pool
             .create_buffer(
@@ -82,8 +82,7 @@ impl WaylandState {
             )
             .context("Failed to create buffer")?;
 
-        // Blit
-        // Blit
+        // Ratatui's cell grid must be rasterized to pixels for the Wayland framebuffer.
         blit_buffer_to_pixels(
             buffer,
             canvas,
@@ -94,12 +93,8 @@ impl WaylandState {
             bg_color_hex,
         );
 
-        // Attach and damage
+        // Wayland's double-buffer protocol: attach new buffer, mark damaged region, then commit.
         if let Some(surface) = &self.surface {
-            // create_buffer returns (WlBuffer, &mut [u8])
-            // WlBuffer is a Proxy.
-            // surface.attach(Some(&wl_buffer), 0, 0);
-
             surface.attach(Some(wl_buffer.wl_buffer()), 0, 0);
             surface.damage_buffer(0, 0, width as i32, height as i32);
             surface.frame(_qh, surface.clone());

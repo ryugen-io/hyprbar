@@ -9,4 +9,4 @@ pub mod logging;
 pub mod registry;
 pub mod runner;
 pub mod watcher;
-pub mod wayland_integration; // New module
+pub mod wayland_integration; // Bridges Wayland event loop with the ratatui rendering pipeline.

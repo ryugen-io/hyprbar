@@ -156,7 +156,7 @@ impl Default for WindowConfig {
         Self {
             height: 30,
             anchor: "top".to_string(),
-            monitor: String::new(), // Empty = compositor decides
+            monitor: String::new(), // Empty lets the compositor pick the primary output.
             scale_font: true,
             pixel_font: false,
             font_base_size: 10,
@@ -172,9 +172,11 @@ mod tests {
 
     #[test]
     fn test_row_based_sizing() {
-        let mut config = WindowConfig::default();
-        config.height_rows = Some(1);
-        config.min_padding = 2;
+        let mut config = WindowConfig {
+            height_rows: Some(1),
+            min_padding: 2,
+            ..WindowConfig::default()
+        };
 
         let (fs, h) = config.calculate_dimensions();
         assert_eq!(fs, 16.0);
@@ -189,12 +191,14 @@ mod tests {
 
     #[test]
     fn test_smart_scaling_standard() {
-        let mut config = WindowConfig::default();
-        config.height_rows = None;
-        config.height = 30;
-        config.min_padding = 6; // 24px available
-        config.scale_font = true;
-        config.pixel_font = false;
+        let config = WindowConfig {
+            height_rows: None,
+            height: 30,
+            min_padding: 6, // 24px available
+            scale_font: true,
+            pixel_font: false,
+            ..WindowConfig::default()
+        };
 
         let (fs, h) = config.calculate_dimensions();
         assert_eq!(h, 30);
@@ -204,12 +208,14 @@ mod tests {
 
     #[test]
     fn test_smart_scaling_pixel_font() {
-        let mut config = WindowConfig::default();
-        config.height = 30;
-        config.min_padding = 2; // 28px available -> 28/1.2 = 23.33
-        config.scale_font = true;
-        config.pixel_font = true;
-        config.font_base_size = 10;
+        let config = WindowConfig {
+            height: 30,
+            min_padding: 2, // 28px available -> 28/1.2 = 23.33
+            scale_font: true,
+            pixel_font: true,
+            font_base_size: 10,
+            ..WindowConfig::default()
+        };
 
         let (fs, _) = config.calculate_dimensions();
         // 23.33 / 10 = 2.33 -> floor 2 -> 2 * 10 = 20.0
@@ -218,9 +224,11 @@ mod tests {
 
     #[test]
     fn test_no_scaling() {
-        let mut config = WindowConfig::default();
-        config.height = 50;
-        config.scale_font = false;
+        let config = WindowConfig {
+            height: 50,
+            scale_font: false,
+            ..WindowConfig::default()
+        };
 
         let (fs, h) = config.calculate_dimensions();
         assert_eq!(h, 50);
@@ -229,7 +237,7 @@ mod tests {
 }
 
 fn default_monitor() -> String {
-    String::new() // Empty = compositor decides
+    String::new() // Empty lets the compositor pick the primary output.
 }
 
 fn default_scale_font() -> bool {

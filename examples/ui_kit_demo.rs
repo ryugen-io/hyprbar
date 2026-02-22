@@ -45,12 +45,12 @@ impl Widget for UiKitDemoWidget {
             return;
         }
 
-        // Render the label
+        // Label must be rendered before the effect so the effect can modify its cells.
         Label::new("UI Kit Demo")
             .variant(TypographyVariant::Accent)
             .render(area, buf, state.config_ink.as_ref());
 
-        // Apply breathing effect only while running
+        // Effects that have completed their timer should not keep processing (wastes cycles).
         let mut effect_lock = self.effect.lock().unwrap();
         if let Some(effect) = effect_lock.as_mut() {
             if effect.running() {

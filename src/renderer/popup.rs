@@ -7,7 +7,7 @@ use ratatui::prelude::*;
 
 impl BarRenderer {
     pub fn check_popup_request(&self) -> Option<(PopupRequest, ActivePopup)> {
-        // If there's an active popup, check if that widget still wants it
+        // Active popup takes priority — avoids flickering if cursor briefly crosses another widget.
         if let Some(active) = &self.active_popup {
             let widget = match active.section {
                 WidgetSection::Left => self.left_widgets.get(active.index),

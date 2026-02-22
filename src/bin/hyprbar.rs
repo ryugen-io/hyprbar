@@ -17,18 +17,17 @@ use hyprbar::tui;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // 1. Load Config (Global Styles) - Essential for logging everywhere
+    // Config must load first — all logging, labels, and theme resolution depend on it.
     let config_ink = std::sync::Arc::new(Config::load().context("Failed to load config")?);
 
-    // 0. Handle Detached Debug Mode
-    // Only if debug is on, no subcommand, AND no action flags (start/stop/restart/autostart)
+    // Debug without subcommand = "launch daemon + viewer", not "run in foreground".
+    // Action flags (start/stop/restart/autostart) take precedence over this shortcut.
     let has_action_flag = cli.start || cli.stop || cli.restart || cli.autostart;
     if cli.debug && cli.command.is_none() && !has_action_flag {
-        // If debug is on and no subcommand, we spawn the daemon and the viewer, then exit
         daemon::spawn_bar_daemon(&config_ink, true)
             .await
             .context("Failed to spawn bar daemon")?;
-        daemon::spawn_debug_viewer(&config_ink).context("Failed to spawn debug viewer")?; // Not async
+        daemon::spawn_debug_viewer(&config_ink).context("Failed to spawn debug viewer")?;
 
         let msg = config_ink
             .layout
@@ -43,20 +42,19 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // 2. Load Bar Config (App Layout & Logging)
     let bar_config = config::load_bar_config(&config_ink);
 
-    // 3. Initialize Logging (after config load)
+    // Logging depends on bar_config for level/filter settings.
     logging::init_logging(
         config_ink.clone(),
         cli.debug,
         &bar_config.logging.level,
         &bar_config.logging.debug_filter,
-        matches!(cli.command, Some(Commands::InternalRun)), // Only bind socket if we are the daemon
+        matches!(cli.command, Some(Commands::InternalRun)), // only the daemon binds the debug socket
     )?;
 
-    // 4. Handle Top-Level Flags (start, stop, restart, autostart)
-    // These take precedence over subcommands for daemon control
+    // Flags take precedence over subcommands — "hyprbar --start compile foo"
+    // should start the daemon, not compile.
     if cli.start {
         hyprlog::internal::debug("CLI", "Handling --start flag -> spawning daemon");
         daemon::spawn_bar_daemon(&config_ink, cli.debug)
@@ -89,14 +87,12 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // 5. Handle Subcommands
     if let Some(cmd) = &cli.command {
         match cmd {
             Commands::InternalWatch { socket_path } => {
                 return watcher::run_watcher(socket_path).await;
             }
             Commands::InternalRun => {
-                // This is the actual bar process, run in foreground
                 let start_msg = config_ink
                     .layout
                     .labels
@@ -198,8 +194,6 @@ async fn main() -> Result<()> {
         }
     }
 
-    // 6. Default Action: No flags or subcommands means launch TUI
-    // TUI manager
-    // Pass bar_config which contains the theme styles
+    // No flags, no subcommands — interactive TUI is the default UX.
     tui::run_tui(bar_config).map_err(|e| anyhow::anyhow!("TUI error: {}", e))
 }

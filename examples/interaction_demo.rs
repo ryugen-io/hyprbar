@@ -2,6 +2,7 @@
 //! Version: 1.0.0
 //! Author: Ryu
 //! Description: Demo showing click, hover, and scroll handling
+//! Has-Popup: true
 
 use hyprbar::prelude::*;
 use std::sync::Mutex;
@@ -77,7 +78,7 @@ impl Widget for InteractionDemoWidget {
 
         let interaction = self.state.lock().unwrap();
 
-        // Build display text based on state
+        // Display adapts to interaction history so users see feedback from their actions.
         let text = if interaction.hover {
             if let Some(btn) = interaction.last_button {
                 // Wayland button codes: BTN_LEFT=272, BTN_RIGHT=273, BTN_MIDDLE=274
@@ -103,7 +104,7 @@ impl Widget for InteractionDemoWidget {
             "Click/Scroll me".to_string()
         };
 
-        // Use different variant based on hover state
+        // Accent variant on hover gives visual confirmation that the widget is interactive.
         let variant = if interaction.hover {
             TypographyVariant::Accent
         } else {
@@ -131,7 +132,7 @@ impl Widget for InteractionDemoWidget {
 
         let interaction = self.state.lock().unwrap();
 
-        // Render popup content
+        // Popup shows accumulated stats so users can verify all input types are working.
         let lines = [
             format!("Clicks: {}", interaction.click_count),
             format!("Scroll: {}", interaction.scroll_offset),
@@ -153,9 +154,4 @@ impl Widget for InteractionDemoWidget {
 #[unsafe(no_mangle)]
 pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
     Box::new(InteractionDemoWidget::new())
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _has_popup() -> bool {
-    true
 }

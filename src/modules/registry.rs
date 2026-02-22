@@ -17,6 +17,8 @@ pub struct PluginMetadata {
     pub description: String,
     pub author: String,
     pub version: String,
+    #[serde(default)]
+    pub has_popup: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -40,7 +42,7 @@ impl Registry {
 
         let bytes = fs::read(&path).context("Failed to read registry file")?;
 
-        // If file is empty, return default
+        // postcard deserialization panics on empty input — treat it as a fresh registry.
         if bytes.is_empty() {
             return Ok(Self::default());
         }
@@ -53,7 +55,7 @@ impl Registry {
     pub fn save(&self) -> Result<()> {
         let path = get_registry_path();
 
-        // Ensure directory exists
+        // First-run: data dir may not exist yet and fs::write doesn't create parents.
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).context("Failed to create registry directory")?;
         }

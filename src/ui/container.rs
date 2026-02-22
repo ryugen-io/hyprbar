@@ -41,7 +41,7 @@ impl Container {
         let (bg, border_fg) = match self.variant {
             ContainerVariant::Base => (
                 theme.resolve_bg("bg"),
-                theme.resolve_color("fg"), // Normal border
+                theme.resolve_color("fg"), // Base variant uses fg so it blends with content text.
             ),
             ContainerVariant::Panel => (
                 theme.resolve_bg("panel_bg"),

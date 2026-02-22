@@ -67,7 +67,7 @@ pub fn handle_wayland_events(
         let height = u16::try_from(wayland_state.height).unwrap_or(u16::MAX);
 
         if width > 0 && height > 0 {
-            // Calculate grid size based on font metrics
+            // Grid dimensions must match font metrics so cell coordinates align with pixel positions.
             let char_w = wayland_state.text_renderer.char_width as u16;
             let char_h = wayland_state.text_renderer.char_height as u16;
 
@@ -106,24 +106,22 @@ pub fn handle_wayland_events(
         return Err(e).context("Wayland dispatch failed");
     }
 
-    // Process Input Events
-    // We do this after dispatch to handle events received this turn
+    // Input must be processed after dispatch so events from this Wayland roundtrip are included.
     for event in wayland_state.input_events.drain(..) {
         let char_w = wayland_state.text_renderer.char_width as f64;
         let char_h = wayland_state.text_renderer.char_height as f64;
 
-        // Extract pixel coordinates if present, else use last known cursor pos
+        // Some event types (Enter/Leave/Scroll) don't carry coordinates, so reuse last known position.
         let (px, py) = match event {
             WidgetEvent::Motion { x, y } | WidgetEvent::Click { x, y, .. } => (x as f64, y as f64),
             _ => (wayland_state.cursor_x, wayland_state.cursor_y),
         };
 
-        // Convert to Cell Coordinates
+        // Widgets operate in cell space, not pixel space.
         if char_w > 0.0 && char_h > 0.0 {
             let cx = (px / char_w) as u16;
             let cy = (py / char_h) as u16;
 
-            // Create a Cell-based event
             let mut cell_event = event;
             match &mut cell_event {
                 WidgetEvent::Motion { x, y } | WidgetEvent::Click { x, y, .. } => {
@@ -137,10 +135,9 @@ pub fn handle_wayland_events(
         }
     }
 
-    // Popup handling: check if widget wants a popup
     handle_popup_lifecycle(wayland_state, &qh, renderer, bar_state, config)?;
 
-    // Render again if input events triggered a redraw
+    // Input events may have changed widget state that hasn't been painted yet.
     if wayland_state.configured && wayland_state.redraw_requested {
         renderer.render_frame(bar_state, Duration::from_millis(16))?;
         wayland_state.draw(
@@ -169,9 +166,8 @@ fn handle_popup_lifecycle(
     let char_h = wayland_state.text_renderer.char_height;
     let anchor_bottom = config.window.anchor == "bottom";
 
-    // Check if hovered widget wants a popup
     if let Some((request, popup_info)) = renderer.check_popup_request() {
-        // Check if we already have this popup active
+        // Avoid destroying and recreating the same popup every frame.
         let needs_create = match renderer.active_popup() {
             Some(active) => {
                 active.section != popup_info.section || active.index != popup_info.index
@@ -180,15 +176,13 @@ fn handle_popup_lifecycle(
         };
 
         if needs_create {
-            // Calculate popup position in pixels
-            // Widget left edge in pixels
+            // Popup dimensions are in cells; Wayland needs pixels.
             let widget_left_px = popup_info.widget_area.x as i32 * char_w as i32;
 
             let popup_width_px = request.width as u32 * char_w as u32;
             let popup_height_px = request.height as u32 * char_h as u32;
 
-            // Base position: widget left edge + offsets
-            // offset 0,0 = popup starts at widget's left edge
+            // Widget-local offset + global config offset lets users fine-tune placement.
             let popup_x = widget_left_px + request.offset_x as i32 + config.popup.offset_x as i32;
             let popup_y = request.offset_y as i32 + config.popup.offset_y as i32;
 
@@ -200,7 +194,6 @@ fn handle_popup_lifecycle(
                 ),
             );
 
-            // Create the popup surface
             create_popup_surface(
                 wayland_state,
                 qh,
@@ -211,19 +204,14 @@ fn handle_popup_lifecycle(
                 anchor_bottom,
             )?;
 
-            // Update renderer state
             renderer.set_active_popup(popup_info, request.width, request.height);
         }
-    } else {
-        // No popup wanted, destroy if active
-        if renderer.active_popup().is_some() {
-            log_debug("POPUP", "Widget no longer requests popup, destroying");
-            destroy_popup_surface(wayland_state);
-            renderer.clear_active_popup();
-        }
+    } else if renderer.active_popup().is_some() {
+        log_debug("POPUP", "Widget no longer requests popup, destroying");
+        destroy_popup_surface(wayland_state);
+        renderer.clear_active_popup();
     }
 
-    // Render popup if configured
     if wayland_state.popup_configured
         && wayland_state.popup_redraw_requested
         && let Some(buf) = renderer.render_popup(bar_state)

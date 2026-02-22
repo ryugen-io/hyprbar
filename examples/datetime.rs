@@ -94,7 +94,7 @@ impl DateTimeConfig {
     fn build_format_string(&self) -> String {
         let mut parts: Vec<String> = Vec::new();
 
-        // Weekday
+        // Weekday first mirrors natural language reading order ("Mon 2024-01-15").
         if self.show_weekday {
             let weekday_fmt = match self.weekday_format.as_str() {
                 "long" => "%A",
@@ -103,7 +103,7 @@ impl DateTimeConfig {
             parts.push(weekday_fmt.to_string());
         }
 
-        // Date
+        // Date before time follows ISO 8601 ordering convention.
         if self.show_date {
             let date_fmt = match self.date_format.as_str() {
                 "DD/MM/YYYY" => "%d/%m/%Y",
@@ -114,12 +114,12 @@ impl DateTimeConfig {
             parts.push(date_fmt.to_string());
         }
 
-        // Week number
+        // ISO week number (KW = Kalenderwoche) follows German convention used in Hyprland community.
         if self.show_week {
             parts.push("KW %V".to_string());
         }
 
-        // Time
+        // Time after date — most-frequently-checked component is at the end for quick scanning.
         if self.show_time {
             let time_fmt = match (self.time_format.as_str(), self.show_seconds) {
                 ("12h", true) => "%I:%M:%S %p",
@@ -130,7 +130,7 @@ impl DateTimeConfig {
             parts.push(time_fmt.to_string());
         }
 
-        // Timezone
+        // Timezone last — rarely needed, so it doesn't clutter the common case.
         if self.show_timezone {
             let tz_fmt = match self.timezone_format.as_str() {
                 "name" => "%Z",
@@ -241,11 +241,11 @@ impl Widget for DateTimeWidget {
             return;
         }
 
-        // Read config and update display
+        // Config may change at any time (hot-reload) — re-read each frame to stay current.
         let config = DateTimeConfig::from_state(state);
         self.update_display(&config);
 
-        // Check for config color override
+        // Per-widget color overrides let users customize individual widgets without changing the theme.
         let _override_color_str = state
             .config
             .widget
@@ -254,7 +254,7 @@ impl Widget for DateTimeWidget {
             .and_then(|t| t.get("color"))
             .and_then(|v| v.as_str());
 
-        // Render using Label
+        // Label handles theme-aware styling and alignment internally.
         Label::new(&self.cached_display)
             .variant(TypographyVariant::Body)
             .render(area, buf, state.config_ink.as_ref());
@@ -264,10 +264,4 @@ impl Widget for DateTimeWidget {
 #[unsafe(no_mangle)]
 pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
     Box::new(DateTimeWidget::new())
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {
-    static META: &[u8] = b"{\"author\":\"Ryu\",\"description\":\"Configurable date and time display with weekday, week number, and timezone support\",\"name\":\"DateTime\",\"version\":\"1.0.0\"}\0";
-    META.as_ptr() as *const _
 }

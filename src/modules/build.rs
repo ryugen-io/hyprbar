@@ -6,7 +6,6 @@ use tokio::fs;
 use tokio::process::Command;
 
 pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
-    // Compile .rs to .so widget plugin
     hyprlog::internal::info("BUILD", &format!("Compiling widget: {:?}", path));
 
     if !path.exists() {
@@ -18,7 +17,8 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Invalid filename"))?;
     let widget_name = file_stem.to_string_lossy().to_string();
 
-    // Create temp directory
+    // Isolated temp dir prevents cross-contamination between concurrent builds
+    // and avoids stale artifacts from previous failed builds.
     let temp_dir = std::env::temp_dir().join(format!("hyprbar_build_{}", widget_name));
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir).await?;
@@ -27,7 +27,6 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
 
     hyprlog::internal::debug("BUILD", &format!("Building in temp dir: {:?}", temp_dir));
 
-    // 1. Cargo init
     let status = Command::new("cargo")
         .arg("init")
         .arg("--lib")
@@ -42,7 +41,7 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         return Err(anyhow::anyhow!("cargo init failed"));
     }
 
-    // 2. Configure [lib] crate-type
+    // cdylib produces a .so that libloading can dlopen at runtime.
     let cargo_toml_path = temp_dir.join("Cargo.toml");
     let mut cargo_toml = fs::read_to_string(&cargo_toml_path).await?;
     if !cargo_toml.contains("[lib]") {
@@ -50,8 +49,8 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         fs::write(&cargo_toml_path, cargo_toml).await?;
     }
 
-    // 3. Add dependencies via cargo add
-    // Add hyprbar as dependency for Widget trait
+    // Plugins need hyprbar for Widget trait + prelude, ratatui for rendering,
+    // tachyonfx for visual effects. These are always needed regardless of widget.
     let hyprbar_path = std::env::current_dir()?;
 
     let status = Command::new("cargo")
@@ -68,7 +67,6 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         return Err(anyhow::anyhow!("Failed to add hyprbar"));
     }
 
-    // Add ratatui
     let status = Command::new("cargo")
         .arg("add")
         .arg("ratatui@0.30.0")
@@ -81,7 +79,8 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         return Err(anyhow::anyhow!("Failed to add ratatui"));
     }
 
-    // Add tachyonfx with sendable feature for Send + Sync
+    // sendable feature is required because Widget: Send + Sync, and tachyonfx
+    // effects must be transferable across the plugin .so boundary.
     let status = Command::new("cargo")
         .arg("add")
         .arg("tachyonfx@0.23.0")
@@ -96,13 +95,15 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         return Err(anyhow::anyhow!("Failed to add tachyonfx"));
     }
 
-    // 4. Parse Metadata & Append Code
+    // Metadata and dependencies are declared in `//!` doc comments so that
+    // the source file is self-describing — no separate manifest required.
     let source_content = fs::read_to_string(path).await?;
     let mut metadata_json = serde_json::json!({
         "name": "Unknown",
         "description": "",
         "author": "",
-        "version": "0.0.1"
+        "version": "0.0.1",
+        "has_popup": false
     });
 
     let mut dependencies = Vec::new();
@@ -120,6 +121,12 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
                     let dep_version = dep_version.trim().trim_matches('"').trim_matches('\'');
                     dependencies.push((dep_name.to_string(), dep_version.to_string()));
                 }
+            } else if key == "has-popup" || key == "has_popup" {
+                // has_popup gates popup vtable calls across .so boundaries
+                // to avoid unstable ABI segfaults.
+                if let Some(obj) = metadata_json.as_object_mut() {
+                    obj["has_popup"] = serde_json::Value::Bool(value.eq_ignore_ascii_case("true"));
+                }
             } else if let Some(obj) = metadata_json.as_object_mut()
                 && obj.contains_key(&key)
             {
@@ -128,7 +135,6 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         }
     }
 
-    // 4b. Install Custom Dependencies
     for (dep_name, dep_version) in dependencies {
         hyprlog::internal::info(
             "BUILD",
@@ -148,29 +154,11 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         }
     }
 
-    // Only inject metadata if not already present
-    let mut final_source = source_content.clone();
-    if !source_content.contains("_plugin_metadata") {
-        let json_str = metadata_json.to_string();
-        let escaped_json = json_str.replace('"', "\\\"");
-
-        let injected_code = format!(
-            r#"
-#[unsafe(no_mangle)]
-pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {{
-    static META: &[u8] = b"{}\0";
-    META.as_ptr() as *const _
-}}
-"#,
-            escaped_json
-        );
-        final_source.push_str(&injected_code);
-    }
-
+    // Source is written as-is — metadata lives in the sidecar JSON instead of
+    // being injected as a C ABI export, eliminating unsafe from plugin code.
     let src_path = temp_dir.join("src/lib.rs");
-    fs::write(&src_path, final_source).await?;
+    fs::write(&src_path, &source_content).await?;
 
-    // 5. Build
     hyprlog::internal::info("BUILD", "Running cargo build...");
     let status = Command::new("cargo")
         .arg("build")
@@ -185,7 +173,6 @@ pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {{
         return Err(anyhow::anyhow!("cargo build failed"));
     }
 
-    // 6. Copy artifact
     let artifact_name = format!("lib{}.so", widget_name);
     let artifact_path = temp_dir.join("target/release").join(&artifact_name);
 
@@ -193,20 +180,27 @@ pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {{
         return Err(anyhow::anyhow!("Artifact not found at {:?}", artifact_path));
     }
 
-    // Output to XDG data directory
     let widgets_dir = dirs::data_local_dir()
         .ok_or_else(|| anyhow::anyhow!("Cannot determine XDG data directory"))?
         .join("hyprbar/widgets");
 
     fs::create_dir_all(&widgets_dir).await?;
 
-    let output_name = format!("{}.so", widget_name);
-    let target_path = widgets_dir.join(&output_name);
-    fs::copy(&artifact_path, &target_path).await?;
+    let so_name = format!("{}.so", widget_name);
+    let json_name = format!("{}.json", widget_name);
+    let target_so = widgets_dir.join(&so_name);
+    let target_json = widgets_dir.join(&json_name);
+
+    fs::copy(&artifact_path, &target_so).await?;
+
+    // Sidecar JSON is co-located with the .so so that plugin_loader can read
+    // metadata without dlopen — eliminating all unsafe from the metadata path.
+    let json_str = serde_json::to_string_pretty(&metadata_json)?;
+    fs::write(&target_json, json_str).await?;
 
     hyprlog::internal::info(
         "BUILD",
-        &format!("Widget compiled successfully: {}", target_path.display()),
+        &format!("Widget compiled successfully: {}", target_so.display()),
     );
 
     Ok(())

@@ -30,7 +30,7 @@ pub fn handle_event(app: &mut App) -> Result<Option<AppSignal>> {
         }
     }
 
-    // Tick logic
+    // Process status can change externally — periodic refresh keeps the TUI accurate.
     if app.last_tick.elapsed() >= tick_rate {
         app.check_process();
         app.last_tick = Instant::now();

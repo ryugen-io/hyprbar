@@ -1,19 +1,15 @@
+use crate::modules::registry::{PluginMetadata, Registry};
 use crate::widget::{PopupRequest, Widget};
-use libloading::{Library, Symbol};
+use libloading::Library;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::collections::HashMap;
 use std::path::Path;
 
-// Type of the creator function in the plugin
 type WidgetCreator = unsafe extern "Rust" fn() -> Box<dyn Widget>;
 
-use crate::modules::registry::Registry;
-
-/// Wraps a plugin-loaded widget to safely intercept popup methods.
 /// Popup calls through the Rust vtable across .so boundaries are unreliable
-/// (unstable ABI), so we only forward them if the plugin explicitly exports
-/// `_has_popup() -> true` via the stable C ABI.
+/// (unstable ABI), so we gate them behind an explicit opt-in from the sidecar JSON.
 struct PluginWidget {
     inner: Box<dyn Widget>,
     has_popup: bool,
@@ -65,8 +61,19 @@ impl Widget for PluginWidget {
     }
 }
 
+/// Graceful fallback to defaults when .json sidecar is absent, so
+/// pre-sidecar plugins (compiled before this change) still load correctly.
+fn load_metadata(so_path: &Path) -> PluginMetadata {
+    let json_path = so_path.with_extension("json");
+    match std::fs::read_to_string(&json_path) {
+        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
+        Err(_) => PluginMetadata::default(),
+    }
+}
+
 pub struct PluginManager {
-    libraries: Vec<Library>,                          // Keep libs loaded
+    // Must outlive `creators` — dropping a Library invalidates all fn pointers from it.
+    libraries: Vec<Library>,
     creators: HashMap<String, (WidgetCreator, bool)>, // (creator, has_popup)
     pub registry: Registry,
 }
@@ -87,9 +94,8 @@ impl PluginManager {
         }
     }
 
-    /// Loads a plugin from a path.
-    /// If register_if_missing is true, it adds it to the registry (enabled).
-    /// If check_enabled is true, it only loads if enabled in registry.
+    /// `register_if_missing` — auto-register unknown plugins (enabled by default).
+    /// `check_enabled` — skip plugins disabled in the registry.
     pub fn load_plugin<P: AsRef<Path>>(
         &mut self,
         path: P,
@@ -98,79 +104,50 @@ impl PluginManager {
     ) -> anyhow::Result<()> {
         let path_ref = path.as_ref();
 
-        // 1. Resolve path to string/filename for registry key
-        // Using file_stem as key or just the filename
+        // Registry uses filename as key because it maps 1:1 to disk
+        // (widget internal name could differ from filename).
         let file_name = path_ref
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or_default()
             .to_string();
 
-        // 2. Registry Check
+        // Early-out avoids dlopen for disabled plugins, saving startup time.
         if check_enabled {
             if let Some(entry) = self.registry.plugins.get(&file_name) {
                 if !entry.enabled {
-                    return Ok(()); // Skip disabled
+                    return Ok(());
                 }
-            } else if register_if_missing {
-                // Fallthrough to load and register
-            } else {
-                return Ok(()); // Not in registry, and not registering -> skip
+            } else if !register_if_missing {
+                return Ok(());
             }
-        } else if register_if_missing {
-            // Fallthrough to load and register
         }
 
-        unsafe {
-            let lib = Library::new(path_ref)?;
+        // Metadata comes from a sidecar JSON file — avoids needing C ABI exports
+        // and eliminates ~25 lines of unsafe that the old _plugin_metadata path required.
+        let metadata = load_metadata(path_ref);
+        let has_popup = metadata.has_popup;
 
-            // Extract Metadata if registering
-            if register_if_missing {
-                // Try to get metadata function
-                let metadata_func: Option<
-                    Symbol<unsafe extern "C" fn() -> *const std::ffi::c_char>,
-                > = lib.get(b"_plugin_metadata").ok();
-
-                let metadata = if let Some(func) = metadata_func {
-                    let ptr = func();
-                    if !ptr.is_null() {
-                        let c_str = std::ffi::CStr::from_ptr(ptr);
-                        let s = c_str.to_string_lossy();
-                        serde_json::from_str(&s).unwrap_or_default()
-                    } else {
-                        crate::modules::registry::PluginMetadata::default()
-                    }
-                } else {
-                    crate::modules::registry::PluginMetadata::default()
-                };
-
-                // Add to registry with extracted metadata
-                self.registry
-                    .install(file_name.clone(), path_ref.to_path_buf(), metadata)?;
-            }
-
-            let func: Symbol<WidgetCreator> = lib.get(b"_create_widget")?;
-
-            // Check if plugin explicitly declares popup support (stable C ABI)
-            let has_popup = lib
-                .get::<extern "C" fn() -> bool>(b"_has_popup")
-                .map(|f| f())
-                .unwrap_or(false);
-
-            // Invoke once to get the widget name (internal name, not filename)
-            // Note: Registry uses filename as key currently.
-            // This might cause mismatch if filename != widget name.
-            // But for simple "enable/disable", filename is safer as it maps to disk.
-            let temp_widget = func();
-            let name = temp_widget.name().to_string();
-
-            // Store the raw function pointer.
-            // The library is kept alive in `self.libraries`, so this is safe *enough*.
-            let func_ptr = *func;
-
-            self.libraries.push(lib);
-            self.creators.insert(name.clone(), (func_ptr, has_popup));
+        if register_if_missing {
+            self.registry
+                .install(file_name.clone(), path_ref.to_path_buf(), metadata)?;
         }
+
+        // SAFETY: The .so is produced by our build pipeline (`compile_widget`) and is
+        // guaranteed to export `_create_widget` with the correct signature.
+        let lib = unsafe { Library::new(path_ref)? };
+        let func = unsafe { lib.get::<WidgetCreator>(b"_create_widget")? };
+
+        // SAFETY: `lib` is pushed to `self.libraries` below, so the function pointer
+        // and the vtable of the returned Box<dyn Widget> remain valid for the
+        // lifetime of PluginManager.
+        let temp_widget = unsafe { func() };
+        let name = temp_widget.name().to_string();
+
+        let func_ptr = *func;
+        self.libraries.push(lib);
+        self.creators.insert(name.clone(), (func_ptr, has_popup));
+
         Ok(())
     }
 }
@@ -178,10 +155,10 @@ impl PluginManager {
 impl crate::widget::WidgetProvider for PluginManager {
     fn create_widget(&self, name: &str) -> Option<Box<dyn Widget>> {
         if let Some(&(creator, has_popup)) = self.creators.get(name) {
-            unsafe {
-                let inner = creator();
-                return Some(Box::new(PluginWidget { inner, has_popup }));
-            }
+            // SAFETY: The corresponding Library is kept alive in `self.libraries`,
+            // so the function pointer is still valid.
+            let inner = unsafe { creator() };
+            return Some(Box::new(PluginWidget { inner, has_popup }));
         }
         None
     }

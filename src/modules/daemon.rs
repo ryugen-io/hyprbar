@@ -18,13 +18,12 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
     let self_exe = env::current_exe().context("Failed to get current executable path")?;
     let pid_file_path = get_pid_file_path();
 
-    // Check if daemon is already running
+    // Avoid spawning a second daemon — the first one owns the Wayland surface.
     if pid_file_path.exists()
         && let Ok(pid_str) = fs::read_to_string(&pid_file_path)
         && let Ok(pid) = pid_str.trim().parse::<u32>()
     {
         if let Ok(_proc) = Process::new(pid as i32) {
-            // Use procfs here
             let msg = config_ink
                 .layout
                 .labels
@@ -44,8 +43,7 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
             fs::remove_file(&pid_file_path).ok(); // Ignore error if cannot remove
         }
     }
-    // Spawn self with internal-run and debug flag
-    // Spawn self with internal-run
+    // Detach into a background process so the CLI can exit immediately.
     let mut command = Command::new(self_exe);
     command.arg("internal-run");
 
@@ -60,13 +58,11 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
         .spawn()
         .context("Failed to spawn background bar process")?;
 
-    // Write PID to file
+    // PID file lets stop/restart find and signal the daemon later.
     let pid = child.id().context("Failed to get child PID")?;
     let mut file = fs::File::create(&pid_file_path)
         .context(format!("Failed to create PID file at {:?}", pid_file_path))?;
     writeln!(file, "{}", pid).context("Failed to write PID to file")?;
-
-    // drop(child); // Explicit drop not strictly needed but safe
 
     let msg = config_ink
         .layout
@@ -89,11 +85,11 @@ pub async fn terminate_bar_daemon(config_ink: &Arc<Config>) -> Result<()> {
             .parse::<i32>()
             .context(format!("Failed to parse PID from '{}'", pid_str))?;
 
-        // Send SIGTERM using nix
+        // SIGTERM lets the daemon run its cleanup/shutdown handlers.
         signal::kill(Pid::from_raw(pid), Signal::SIGTERM)
             .context(format!("Failed to send SIGTERM to PID {}", pid))?;
 
-        // Use tokio::time::sleep for async context
+        // Give the daemon time to release the Wayland surface before we clean up.
         sleep(Duration::from_millis(500)).await;
 
         fs::remove_file(&pid_file_path)
@@ -140,7 +136,7 @@ pub async fn restart_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result
 pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
     let socket_path = get_socket_path();
 
-    // Check if a debug viewer is already running for this socket
+    // Multiple viewers on the same socket would duplicate output.
     if is_debug_viewer_running(&socket_path) {
         hyprlog::internal::debug("DAEMON", "Debug viewer already running, skipping spawn");
         return Ok(());
@@ -188,7 +184,7 @@ fn is_debug_viewer_running(socket_path: &std::path::Path) -> bool {
 
     let socket_str = socket_path.to_string_lossy();
 
-    // Check /proc for processes with internal-watch in cmdline
+    // procfs is the only reliable way to find a viewer without a PID file.
     if let Ok(entries) = fs::read_dir("/proc") {
         for entry in entries.flatten() {
             let path = entry.path();

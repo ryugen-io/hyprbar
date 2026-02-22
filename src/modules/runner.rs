@@ -11,7 +11,6 @@ use std::sync::Arc;
 pub async fn run_server(initial_config_ink: Arc<Config>, initial_config: BarConfig) -> Result<()> {
     log_debug("BAR", "Starting server initialization");
 
-    // Initialize application components using the bootstrap module
     let (config_ink, config, bar_state, _plugin_manager, mut renderer) =
         bootstrap::init_application(initial_config_ink, initial_config)
             .await
@@ -19,7 +18,8 @@ pub async fn run_server(initial_config_ink: Arc<Config>, initial_config: BarConf
 
     log_debug("BAR", "Bootstrap complete");
 
-    // Pre-fetch log strings (Config consumed later)
+    // Labels fetched now — config_ink is shared via Arc and these strings
+    // are used after the event loop where borrowing would be inconvenient.
     let get_msg = |key: &str, default: &str| -> String {
         config_ink
             .layout
@@ -32,7 +32,6 @@ pub async fn run_server(initial_config_ink: Arc<Config>, initial_config: BarConf
     let msg_loop = get_msg("bar_start_loop", "Starting Wayland event loop");
     let msg_exit = get_msg("bar_exit", "Exiting...");
 
-    // 6. Initialize Wayland & Smart Scaling
     log_debug("WAYLAND", "Initializing Wayland integration");
     let (mut wayland_state, mut event_queue, _layer_surface) =
         wayland_integration::init_wayland_integration(&config)
@@ -41,7 +40,6 @@ pub async fn run_server(initial_config_ink: Arc<Config>, initial_config: BarConf
 
     log_info("WAYLAND", "Wayland integration initialized");
 
-    // 7. Event Loop
     log_info("BAR", &msg_loop);
     log_debug(
         "WAYLAND",

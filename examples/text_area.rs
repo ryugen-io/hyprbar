@@ -69,10 +69,3 @@ impl TextArea {
 pub extern "Rust" fn _create_widget() -> Box<dyn Widget> {
     Box::new(TextArea::new())
 }
-
-#[unsafe(no_mangle)]
-pub extern "C" fn _plugin_metadata() -> *const std::ffi::c_char {
-    static META: &[u8] =
-        b"{\"author\":\"\",\"description\":\"\",\"name\":\"Unknown\",\"version\":\"0.0.1\"}\0";
-    META.as_ptr() as *const _
-}

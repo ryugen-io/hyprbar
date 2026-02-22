@@ -13,14 +13,14 @@ use hyprlog::Logger;
 
 use crate::modules::config::get_socket_path;
 
-/// Global channel for broadcasting logs to connected debug terminals
+/// Debug viewers connect over Unix sockets and need a shared channel to receive live logs.
 pub static LOG_CHANNEL: OnceLock<broadcast::Sender<String>> = OnceLock::new();
-/// Global buffer for capturing startup logs to send to new clients
+/// Viewers that connect after boot would miss initialization messages without a replay buffer.
 pub static STARTUP_BUFFER: OnceLock<Mutex<VecDeque<String>>> = OnceLock::new();
-/// Global hyprlog logger for file output
+/// Tracing layers are stateless callbacks — they need a shared logger to persist output to disk.
 pub static HYPRLOG: OnceLock<Logger> = OnceLock::new();
 
-/// Log to both hyprlog and debug socket
+/// Dual output ensures log messages reach both persistent storage and live debug viewers.
 pub fn log_info(scope: &str, msg: &str) {
     hyprlog::internal::info(scope, msg);
     broadcast_log("INFO", scope, msg);
@@ -59,7 +59,7 @@ fn broadcast_log(level: &str, scope: &str, msg: &str) {
         msg
     );
 
-    // Save to startup buffer
+    // Late-connecting viewers need to see logs from before they attached.
     if let Some(buffer) = STARTUP_BUFFER.get()
         && let Ok(mut lock) = buffer.lock()
     {
@@ -69,7 +69,6 @@ fn broadcast_log(level: &str, scope: &str, msg: &str) {
         lock.push_back(formatted.clone());
     }
 
-    // Broadcast to connected clients
     if let Some(sender) = LOG_CHANNEL.get() {
         let _ = sender.send(formatted);
     }
@@ -77,7 +76,7 @@ fn broadcast_log(level: &str, scope: &str, msg: &str) {
 
 struct SocketSubscriberLayer;
 
-/// Layer that forwards tracing events to hyprlog for file output
+/// Tracing's subscriber model requires a Layer to bridge events into hyprlog's file-based API.
 struct HyprlogLayer;
 
 impl<S> Layer<S> for HyprlogLayer
@@ -95,7 +94,7 @@ where
 
         let metadata = event.metadata();
 
-        // Extract message
+        // tracing doesn't give direct access to the message — visitor pattern is required.
         struct MessageVisitor(String);
         impl tracing::field::Visit for MessageVisitor {
             fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
@@ -114,7 +113,6 @@ where
         event.record(&mut visitor);
         let message = visitor.0;
 
-        // Map tracing level to hyprlog level
         let target = metadata.target();
         let scope = if target.starts_with("hyprbar") {
             "HYPRBAR"
@@ -141,7 +139,6 @@ where
         event: &tracing::Event<'_>,
         _ctx: tracing_subscriber::layer::Context<'_, S>,
     ) {
-        // Format similarly to previous logger
         let metadata = event.metadata();
 
         let level_color = match *metadata.level() {
@@ -154,12 +151,11 @@ where
 
         let timestamp = chrono::Local::now().format("%H:%M:%S").to_string().dimmed();
 
-        // Visitor to extract message field
         struct MessageVisitor(String);
         impl tracing::field::Visit for MessageVisitor {
             fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
                 if field.name() == "message" {
-                    // Tracing messages use fmt::Arguments which print correctly via Debug
+                    // fmt::Arguments implements Debug but not Display, so {:?} is correct here.
                     self.0.push_str(&format!("{:?}", value));
                 }
             }
@@ -176,7 +172,7 @@ where
 
         let msg = format!("{} [{}] {}\n", timestamp, level_color, message);
 
-        // Save to Startup Buffer
+        // Late-connecting viewers need to see logs from before they attached.
         #[allow(clippy::collapsible_if)]
         if let Some(buffer) = STARTUP_BUFFER.get() {
             if let Ok(mut lock) = buffer.lock() {
@@ -187,7 +183,6 @@ where
             }
         }
 
-        // Broadcast
         if let Some(sender) = LOG_CHANNEL.get() {
             let _ = sender.send(msg);
         }
@@ -201,21 +196,18 @@ pub fn init_logging(
     config_filter: &str,
     bind_socket: bool,
 ) -> anyhow::Result<()> {
-    // Force colored output even if no TTY (daemon mode)
+    // Daemon runs without a TTY, but debug viewers expect ANSI colors.
     colored::control::set_override(true);
 
-    // 1. Setup Broadcast Channel
     let (tx, _) = broadcast::channel(100);
     LOG_CHANNEL
         .set(tx.clone())
         .map_err(|_| anyhow::anyhow!("Failed to set global log channel"))?;
 
-    // 2. Setup Startup Buffer
     STARTUP_BUFFER
         .set(Mutex::new(VecDeque::with_capacity(50)))
         .map_err(|_| anyhow::anyhow!("Failed to set global startup buffer"))?;
 
-    // 3. Setup Tracing Subscriber
     let env_filter = tracing_subscriber::EnvFilter::builder()
         .with_default_directive(tracing::Level::INFO.into())
         .parse_lossy(if enable_debug {
@@ -226,19 +218,18 @@ pub fn init_logging(
 
     let socket_layer = SocketSubscriberLayer;
 
-    // Fmt layer for stderr as fallback/standard behavior
+    // stderr fallback ensures logs appear even without a debug viewer.
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
         .with_target(false)
-        .without_time(); // Time is handled by our socket layer or rely on systemd
+        .without_time(); // timestamps come from the socket layer or systemd journal
 
-    // Optional Publisher Layer (Client Side)
-    // Always try to connect if we are NOT the daemon (cli commands)
+    // CLI commands (non-daemon) forward their logs to the daemon's viewer socket.
     let publisher_layer = if !bind_socket {
         let socket_path = get_socket_path();
         if socket_path.exists() {
             if let Ok(stream) = std::os::unix::net::UnixStream::connect(socket_path) {
-                // Shutdown read to indicate we are only writing (and avoid buffer filling from daemon echo)
+                // Read side unused — shutting it prevents the daemon's echo from filling the buffer.
                 let _ = stream.shutdown(std::net::Shutdown::Read);
                 Some(SocketPublisherLayer {
                     stream: Mutex::new(stream),
@@ -253,7 +244,6 @@ pub fn init_logging(
         None
     };
 
-    // Initialize hyprlog Logger for file output
     HYPRLOG
         .set(Logger::from_config("hyprbar"))
         .map_err(|_| anyhow::anyhow!("Failed to set hyprlog logger"))?;
@@ -268,7 +258,7 @@ pub fn init_logging(
         .with(hyprlog_layer)
         .init();
 
-    // 4. Start Socket Server if debug is enabled AND we are the daemon
+    // Only the daemon owns the socket — CLI processes connect as clients above.
     if enable_debug && bind_socket {
         let socket_path = get_socket_path();
         if socket_path.exists() {
@@ -276,7 +266,7 @@ pub fn init_logging(
         }
 
         let listener = UnixListener::bind(&socket_path).context("Failed to bind debug socket")?;
-        let tx = tx.clone(); // Clone for the spawn
+        let tx = tx.clone();
 
         tokio::spawn(async move {
             loop {
@@ -286,7 +276,8 @@ pub fn init_logging(
                         let tx_for_read = tx.clone();
                         let mut rx_for_write = tx.subscribe();
 
-                        // READER TASK (Publisher -> Hub)
+                        // CLI processes publish logs here — without ingesting them,
+                        // only daemon-internal logs would reach debug viewers.
                         tokio::spawn(async move {
                             use tokio::io::{AsyncBufReadExt, BufReader};
                             let mut buf_reader = BufReader::new(reader);
@@ -294,15 +285,15 @@ pub fn init_logging(
                             while let Ok(n) = buf_reader.read_line(&mut line).await {
                                 if n == 0 {
                                     break;
-                                } // EOF
+                                }
                                 let _ = tx_for_read.send(line.clone());
                                 line.clear();
                             }
                         });
 
-                        // WRITER TASK (Hub -> Viewer)
+                        // Viewers that connect after boot would miss initialization
+                        // messages without a replay step.
                         tokio::spawn(async move {
-                            // Send startup logs first
                             let startup_logs: Vec<String> =
                                 if let Some(buffer) = STARTUP_BUFFER.get() {
                                     if let Ok(lock) = buffer.lock() {
@@ -336,7 +327,8 @@ pub fn init_logging(
     Ok(())
 }
 
-/// Layer that publishes logs to a UnixStream (Client Side)
+/// CLI processes aren't the daemon — they forward logs over a socket so
+/// the daemon's debug viewer can show them.
 struct SocketPublisherLayer {
     stream: Mutex<std::os::unix::net::UnixStream>,
 }
@@ -350,7 +342,6 @@ where
         event: &tracing::Event<'_>,
         _ctx: tracing_subscriber::layer::Context<'_, S>,
     ) {
-        // Format similarly to SocketSubscriberLayer
         let metadata = event.metadata();
         let level_color = match *metadata.level() {
             tracing::Level::ERROR => "ERROR".red(),
