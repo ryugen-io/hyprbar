@@ -85,7 +85,9 @@ write_config() {
 # -----------------------------------------------------------------------------
 # Config Templates
 # -----------------------------------------------------------------------------
-HYPRBAR_CONFIG='# Hyprbar Configuration
+HYPRBAR_CONFIG='# hypr metadata
+# type = bar
+# Hyprbar Configuration
 
 [window]
 height = 30

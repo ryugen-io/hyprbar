@@ -22,6 +22,7 @@ required-features = ["cli"]
 
 [dependencies]
 # Hypr ecosystem
+hypr-conf = { git = "https://github.com/ryugen-io/hypr-conf.git", branch = "main" }
 hyprink = { git = "ssh://git@github.com/ryugen-io/hyprink.git", branch = "master", default-features = false }
 hyprlog = { git = "ssh://git@github.com/ryugen-io/hyprlog.git", branch = "main", default-features = false }
 

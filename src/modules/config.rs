@@ -1,34 +1,47 @@
 use crate::config::BarConfig;
+use crate::modules::logging::{log_error, log_warn};
 use anyhow::{Context, Result};
+use hypr_conf::{ConfigMetaSpec, resolve_config_path_strict};
 use hyprink::config::Config;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use toml::Value;
 
+const TYPE_VALUE: &str = "bar";
+const CONFIG_EXTENSIONS: &[&str] = &["conf"];
+
 pub fn load_bar_config(_config_ink: &Config) -> BarConfig {
     let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let config_dir = PathBuf::from(home).join(".config").join("hypr");
-    let config_path = config_dir.join("hyprbar.conf");
+    let Some(config_path) = resolve_bar_config_path(&config_dir) else {
+        log_warn(
+            "CONFIG",
+            "No config with required metadata header found; using defaults.",
+        );
+        return BarConfig::default();
+    };
 
-    if config_path.exists() {
-        match load_recursive_config(&config_path, &config_dir) {
-            Ok(value) => match value.try_into() {
-                Ok(cfg) => return cfg,
-                Err(e) => hyprlog::internal::error(
-                    "CONFIG",
-                    &format!("Failed to deserialize config: {}", e),
-                ),
-            },
-            Err(e) => hyprlog::internal::error(
-                "CONFIG",
-                &format!("Failed to load config with includes: {}", e),
-            ),
-        }
+    let base_dir = config_path.parent().unwrap_or(config_dir.as_path());
+    match load_recursive_config(&config_path, base_dir) {
+        Ok(value) => match value.try_into() {
+            Ok(cfg) => return cfg,
+            Err(e) => log_error("CONFIG", &format!("Failed to deserialize config: {}", e)),
+        },
+        Err(e) => log_error(
+            "CONFIG",
+            &format!("Failed to load config with includes: {}", e),
+        ),
     }
 
     // Missing or broken config shouldn't prevent the bar from starting — use sensible defaults.
     BarConfig::default()
+}
+
+fn resolve_bar_config_path(config_dir: &Path) -> Option<PathBuf> {
+    let default_path = config_dir.join("hyprbar.conf");
+    let spec = ConfigMetaSpec::for_type(TYPE_VALUE, CONFIG_EXTENSIONS);
+    resolve_config_path_strict(config_dir, &default_path, &spec)
 }
 
 fn load_recursive_config(path: &Path, base_dir: &Path) -> Result<Value> {
@@ -67,7 +80,7 @@ fn load_recursive_config(path: &Path, base_dir: &Path) -> Result<Value> {
                             merge_toml_values(&mut root_value, included_value);
                         }
                         Err(e) => {
-                            hyprlog::internal::warn(
+                            log_warn(
                                 "CONFIG",
                                 &format!("Glob error for pattern '{}': {}", pattern_str, e),
                             );
@@ -76,14 +89,14 @@ fn load_recursive_config(path: &Path, base_dir: &Path) -> Result<Value> {
                 }
 
                 if !found_any {
-                    hyprlog::internal::warn(
+                    log_warn(
                         "CONFIG",
                         &format!("No files matched include pattern: '{}'", pattern_str),
                     );
                 }
             }
             Err(e) => {
-                hyprlog::internal::warn(
+                log_warn(
                     "CONFIG",
                     &format!("Invalid glob pattern '{}': {}", pattern_str, e),
                 );
@@ -104,7 +117,7 @@ fn merge_toml_values(base: &mut Value, other: Value) {
                         if k != "include" && !k.starts_with("dish") {
                             // Tables merge recursively — warning on table overlap would be noisy and misleading.
                             if !base_val.is_table() || !v.is_table() {
-                                hyprlog::internal::warn(
+                                log_warn(
                                     "CONFIG",
                                     &format!(
                                         "Duplicate key '{}' being overwritten during merge.",
