@@ -3,6 +3,7 @@ pub mod handlers;
 pub mod state;
 pub mod text;
 
+use crate::modules::logging::log_debug;
 use anyhow::{Context, Result};
 use smithay_client_toolkit::{
     compositor::CompositorState,
@@ -161,7 +162,7 @@ pub fn create_popup_surface(
     state.popup_configured = false;
     state.popup_redraw_requested = true;
 
-    hyprlog::internal::debug(
+    log_debug(
         "POPUP",
         &format!("Created popup {}x{} at ({}, {})", width, height, x, y),
     );
@@ -172,7 +173,7 @@ pub fn create_popup_surface(
 /// Cleanup prevents leaked Wayland objects and frees the shared-memory pool.
 pub fn destroy_popup_surface(state: &mut WaylandState) {
     if state.popup_layer.is_some() {
-        hyprlog::internal::debug("POPUP", "Destroying popup surface");
+        log_debug("POPUP", "Destroying popup surface");
     }
 
     // Layer surface must drop before the wl_surface — Wayland protocol requires child objects to be destroyed first.

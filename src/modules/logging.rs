@@ -22,23 +22,51 @@ pub static HYPRLOG: OnceLock<Logger> = OnceLock::new();
 
 /// Dual output ensures log messages reach both persistent storage and live debug viewers.
 pub fn log_info(scope: &str, msg: &str) {
-    hyprlog::internal::info(scope, msg);
+    log_with_hyprlog(Level::Info, scope, msg);
     broadcast_log("INFO", scope, msg);
 }
 
 pub fn log_debug(scope: &str, msg: &str) {
-    hyprlog::internal::debug(scope, msg);
+    log_with_hyprlog(Level::Debug, scope, msg);
     broadcast_log("DEBUG", scope, msg);
 }
 
 pub fn log_warn(scope: &str, msg: &str) {
-    hyprlog::internal::warn(scope, msg);
+    log_with_hyprlog(Level::Warn, scope, msg);
     broadcast_log("WARN", scope, msg);
 }
 
 pub fn log_error(scope: &str, msg: &str) {
-    hyprlog::internal::error(scope, msg);
+    log_with_hyprlog(Level::Error, scope, msg);
     broadcast_log("ERROR", scope, msg);
+}
+
+#[derive(Clone, Copy)]
+enum Level {
+    Info,
+    Debug,
+    Warn,
+    Error,
+}
+
+// Use the configured hyprlog logger as the primary sink.
+// Fallback keeps early-start logs visible before init_logging() runs.
+fn log_with_hyprlog(level: Level, scope: &str, msg: &str) {
+    if let Some(logger) = HYPRLOG.get() {
+        match level {
+            Level::Info => logger.info(scope, msg),
+            Level::Debug => logger.debug(scope, msg),
+            Level::Warn => logger.warn(scope, msg),
+            Level::Error => logger.error(scope, msg),
+        }
+    } else {
+        match level {
+            Level::Info => hyprlog::internal::info(scope, msg),
+            Level::Debug => hyprlog::internal::debug(scope, msg),
+            Level::Warn => hyprlog::internal::warn(scope, msg),
+            Level::Error => hyprlog::internal::error(scope, msg),
+        }
+    }
 }
 
 fn broadcast_log(level: &str, scope: &str, msg: &str) {

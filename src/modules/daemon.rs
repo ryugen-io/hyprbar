@@ -1,7 +1,7 @@
 use crate::modules::config::{get_pid_file_path, get_socket_path};
+use crate::modules::logging::{log_debug, log_info, log_warn};
 use anyhow::{Context, Result};
 use hyprink::config::Config;
-use hyprlog;
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use procfs::process::Process;
@@ -30,7 +30,7 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
                 .get("bar_running")
                 .map(|p| p.replace("{pid}", &pid.to_string()))
                 .unwrap_or_else(|| format!("daemon running (pid: {})", pid));
-            hyprlog::internal::info("DAEMON", &msg);
+            log_info("DAEMON", &msg);
             return Ok(());
         } else {
             let msg = config_ink
@@ -39,7 +39,7 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
                 .get("bar_stale")
                 .cloned()
                 .unwrap_or_else(|| "stale pid file cleaned".to_string());
-            hyprlog::internal::warn("DAEMON", &msg);
+            log_warn("DAEMON", &msg);
             fs::remove_file(&pid_file_path).ok(); // Ignore error if cannot remove
         }
     }
@@ -70,7 +70,7 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
         .get("bar_start")
         .map(|p| p.replace("{pid}", &pid.to_string()))
         .unwrap_or_else(|| format!("daemon started (pid: {})", pid));
-    hyprlog::internal::info("DAEMON", &msg);
+    log_info("DAEMON", &msg);
     Ok(())
 }
 
@@ -101,7 +101,7 @@ pub async fn terminate_bar_daemon(config_ink: &Arc<Config>) -> Result<()> {
             .get("bar_stop")
             .map(|p| p.replace("{pid}", &pid.to_string()))
             .unwrap_or_else(|| format!("daemon terminated (pid: {})", pid));
-        hyprlog::internal::info("DAEMON", &msg);
+        log_info("DAEMON", &msg);
     } else {
         let msg = config_ink
             .layout
@@ -109,7 +109,7 @@ pub async fn terminate_bar_daemon(config_ink: &Arc<Config>) -> Result<()> {
             .get("bar_not_found")
             .cloned()
             .unwrap_or_else(|| "no daemon found".to_string());
-        hyprlog::internal::info("DAEMON", &msg);
+        log_info("DAEMON", &msg);
     }
     Ok(())
 }
@@ -121,7 +121,7 @@ pub async fn restart_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result
         .get("bar_restart")
         .cloned()
         .unwrap_or_else(|| "restarting daemon...".to_string());
-    hyprlog::internal::info("DAEMON", &msg);
+    log_info("DAEMON", &msg);
 
     terminate_bar_daemon(config_ink)
         .await
@@ -138,7 +138,7 @@ pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
 
     // Multiple viewers on the same socket would duplicate output.
     if is_debug_viewer_running(&socket_path) {
-        hyprlog::internal::debug("DAEMON", "Debug viewer already running, skipping spawn");
+        log_debug("DAEMON", "Debug viewer already running, skipping spawn");
         return Ok(());
     }
 
@@ -165,7 +165,7 @@ pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
             .spawn()
             .context("Failed to spawn debug terminal")?;
 
-        hyprlog::internal::info("DAEMON", "Debug viewer spawned");
+        log_info("DAEMON", "Debug viewer spawned");
     } else {
         let msg = config_ink
             .layout
@@ -173,7 +173,7 @@ pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
             .get("bar_term_error")
             .cloned()
             .unwrap_or_else(|| "no compatible terminal found for debug".to_string());
-        hyprlog::internal::warn("DAEMON", &msg);
+        log_warn("DAEMON", &msg);
     }
 
     Ok(())
@@ -198,10 +198,7 @@ fn is_debug_viewer_running(socket_path: &std::path::Path) -> bool {
                     && cmdline.contains("internal-watch")
                     && cmdline.contains(&*socket_str)
                 {
-                    hyprlog::internal::debug(
-                        "DAEMON",
-                        &format!("Found existing viewer PID {}", pid),
-                    );
+                    log_debug("DAEMON", &format!("Found existing viewer PID {}", pid));
                     return true;
                 }
             }

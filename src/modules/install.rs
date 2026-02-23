@@ -1,10 +1,11 @@
+use crate::modules::logging::{log_info, log_warn};
 use anyhow::Result;
 use hyprink::config::Config;
 use std::path::Path;
 use tokio::fs;
 
 pub async fn install_widget(path: &Path, _config_ink: &Config) -> Result<()> {
-    hyprlog::internal::info("INSTALL", &format!("Installing widget: {:?}", path));
+    log_info("INSTALL", &format!("Installing widget: {:?}", path));
     let data_dir = dirs::data_local_dir().unwrap().join("hyprbar/widgets");
     fs::create_dir_all(&data_dir).await?;
 
@@ -23,14 +24,14 @@ pub async fn install_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         fs::copy(&json_source, &json_target).await?;
     }
 
-    hyprlog::internal::info("INSTALL", &format!("Widget installed to: {:?}", target_so));
+    log_info("INSTALL", &format!("Widget installed to: {:?}", target_so));
 
     // Graceful fallback to defaults when sidecar is absent, so pre-sidecar
     // plugins still install and appear in the registry with blank metadata.
     let metadata = match fs::read_to_string(&json_target).await {
         Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
         Err(_) => {
-            hyprlog::internal::warn("INSTALL", "No sidecar metadata found, using defaults");
+            log_warn("INSTALL", "No sidecar metadata found, using defaults");
             crate::modules::registry::PluginMetadata::default()
         }
     };

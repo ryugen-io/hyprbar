@@ -1,3 +1,4 @@
+use crate::modules::logging::log_debug;
 use crate::wayland::state::WaylandState;
 use smithay_client_toolkit::reexports::client::protocol::wl_pointer;
 use smithay_client_toolkit::shell::WaylandSurface;
@@ -163,7 +164,7 @@ impl LayerShellHandler for WaylandState {
         if let Some(popup_layer) = &self.popup_layer
             && popup_layer.wl_surface() == layer.wl_surface()
         {
-            hyprlog::internal::debug("POPUP", "Popup closed externally");
+            log_debug("POPUP", "Popup closed externally");
             self.popup_layer = None;
             self.popup_surface = None;
             self.popup_pool = None;
@@ -192,7 +193,7 @@ impl LayerShellHandler for WaylandState {
             }
             self.popup_configured = true;
             self.popup_redraw_requested = true;
-            hyprlog::internal::debug(
+            log_debug(
                 "POPUP",
                 &format!(
                     "Popup configured {}x{}",
@@ -229,7 +230,7 @@ impl SeatHandler for WaylandState {
         capability: Capability,
     ) {
         if capability == Capability::Pointer && self.seat_state.get_pointer(qh, &seat).is_ok() {
-            hyprlog::internal::debug("WAYLAND", "Pointer capability acquired");
+            log_debug("WAYLAND", "Pointer capability acquired");
         }
     }
     fn remove_capability(

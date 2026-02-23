@@ -1,0 +1,20 @@
+# Widget Integration TODO
+
+## Event Bus - Inter-Widget Kommunikation
+- bus.rs ist schon vorbereitet
+- Widgets können Events broadcasten
+- Andere Widgets können subscriben
+- Use case: Battery low → andere Widgets reagieren
+
+## Service Traits - Spezielle Capabilities
+- TrayWidget - System Tray Integration (StatusNotifierItem D-Bus)
+- NotificationWidget - Desktop Notifications
+- MediaWidget - MPRIS D-Bus
+- NetworkWidget - NetworkManager D-Bus
+
+## Command Channel - Widget → Bar Commands
+- OpenURL(url) - xdg-open
+- RunCommand(cmd) - shell exec
+- CopyToClipboard(text) - wl-copy
+- ShowNotification(title, body)
+- ToggleWidget(name) - andere Widgets ein/ausschalten

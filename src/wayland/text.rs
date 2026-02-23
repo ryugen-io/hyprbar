@@ -1,3 +1,4 @@
+use crate::modules::logging::{log_debug, log_warn};
 use anyhow::Result;
 use cosmic_text::fontdb::{Database, Source};
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache};
@@ -22,18 +23,18 @@ impl TextRenderer {
 
         // fc-match resolves logical names to file paths; direct paths bypass it.
         let font_to_load = if let Some(path_str) = font_path {
-            hyprlog::internal::debug("FONT", &format!("Requesting user font: {}", path_str));
+            log_debug("FONT", &format!("Requesting user font: {}", path_str));
             let path = PathBuf::from(path_str);
             if path.exists() {
                 Some(path)
             } else if let Some(resolved) = resolve_font_via_fc_match(path_str) {
-                hyprlog::internal::debug(
+                log_debug(
                     "FONT",
                     &format!("Resolved '{}' to '{}'", path_str, resolved),
                 );
                 Some(PathBuf::from(resolved))
             } else {
-                hyprlog::internal::warn(
+                log_warn(
                     "FONT",
                     &format!(
                         "Could not find font '{}', falling back to defaults.",
@@ -45,7 +46,7 @@ impl TextRenderer {
             }
         } else {
             // Monospace is the safest default for a terminal-style grid layout.
-            hyprlog::internal::debug("FONT", "No font specified, resolving system monospace");
+            log_debug("FONT", "No font specified, resolving system monospace");
             resolve_font_via_fc_match("monospace").map(PathBuf::from)
         };
 
@@ -56,12 +57,12 @@ impl TextRenderer {
         if let Some(path) = font_to_load {
             if let Ok(data) = std::fs::read(&path) {
                 db.load_font_source(Source::Binary(std::sync::Arc::new(data)));
-                hyprlog::internal::debug("FONT", &format!("Loaded font file: {:?}", path));
+                log_debug("FONT", &format!("Loaded font file: {:?}", path));
             } else {
-                hyprlog::internal::warn("FONT", &format!("Failed to read font file: {:?}", path));
+                log_warn("FONT", &format!("Failed to read font file: {:?}", path));
             }
         } else {
-            hyprlog::internal::warn("FONT", "No specific font loaded. Text might not render.");
+            log_warn("FONT", "No specific font loaded. Text might not render.");
         }
 
         let mut font_system = FontSystem::new_with_locale_and_db("en-US".into(), db);
@@ -95,7 +96,7 @@ impl TextRenderer {
         let char_width = char_width.max(1);
         let char_height = line_height.ceil() as usize;
 
-        hyprlog::internal::debug(
+        log_debug(
             "FONT",
             &format!(
                 "TextRenderer initialized. Grid: {}x{}",
@@ -105,7 +106,7 @@ impl TextRenderer {
 
         // Log loaded faces to help diagnose font-not-found issues.
         for face in font_system.db().faces() {
-            hyprlog::internal::debug(
+            log_debug(
                 "FONT",
                 &format!(
                     "Loaded face: {:?} (Families: {:?})",
@@ -140,7 +141,7 @@ fn resolve_font_via_fc_match(font_name: &str) -> Option<String> {
                 }
             }
         }
-        Err(e) => hyprlog::internal::debug("FONT", &format!("Failed to run fc-match: {}", e)),
+        Err(e) => log_debug("FONT", &format!("Failed to run fc-match: {}", e)),
     }
     None
 }

@@ -1,3 +1,4 @@
+use crate::modules::logging::{log_debug, log_info};
 use anyhow::{Context, Result};
 use hyprink::config::Config;
 use std::path::Path;
@@ -6,7 +7,7 @@ use tokio::fs;
 use tokio::process::Command;
 
 pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
-    hyprlog::internal::info("BUILD", &format!("Compiling widget: {:?}", path));
+    log_info("BUILD", &format!("Compiling widget: {:?}", path));
 
     if !path.exists() {
         return Err(anyhow::anyhow!("File not found: {:?}", path));
@@ -25,7 +26,7 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
     }
     fs::create_dir_all(&temp_dir).await?;
 
-    hyprlog::internal::debug("BUILD", &format!("Building in temp dir: {:?}", temp_dir));
+    log_debug("BUILD", &format!("Building in temp dir: {:?}", temp_dir));
 
     let status = Command::new("cargo")
         .arg("init")
@@ -136,7 +137,7 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
     }
 
     for (dep_name, dep_version) in dependencies {
-        hyprlog::internal::info(
+        log_info(
             "BUILD",
             &format!("Adding dependency: {} = {}", dep_name, dep_version),
         );
@@ -159,7 +160,7 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
     let src_path = temp_dir.join("src/lib.rs");
     fs::write(&src_path, &source_content).await?;
 
-    hyprlog::internal::info("BUILD", "Running cargo build...");
+    log_info("BUILD", "Running cargo build...");
     let status = Command::new("cargo")
         .arg("build")
         .arg("--release")
@@ -198,7 +199,7 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
     let json_str = serde_json::to_string_pretty(&metadata_json)?;
     fs::write(&target_json, json_str).await?;
 
-    hyprlog::internal::info(
+    log_info(
         "BUILD",
         &format!("Widget compiled successfully: {}", target_so.display()),
     );

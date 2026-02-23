@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
             .get("bar_debug_started")
             .cloned()
             .unwrap_or_else(|| "debug mode started".to_string());
-        hyprlog::internal::info(
+        log_info(
             "BAR",
             &format!("{} Socket: {:?}", msg, config::get_socket_path()),
         );
@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
     // Flags take precedence over subcommands — "hyprbar --start compile foo"
     // should start the daemon, not compile.
     if cli.start {
-        hyprlog::internal::debug("CLI", "Handling --start flag -> spawning daemon");
+        log_debug("CLI", "Handling --start flag -> spawning daemon");
         daemon::spawn_bar_daemon(&config_ink, cli.debug)
             .await
             .context("Failed to spawn bar daemon")?;
@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
         return Ok(());
     }
     if cli.restart {
-        hyprlog::internal::debug("CLI", "Handling --restart flag -> restarting daemon");
+        log_debug("CLI", "Handling --restart flag -> restarting daemon");
         daemon::restart_bar_daemon(&config_ink, cli.debug)
             .await
             .context("Failed to restart bar daemon")?;
@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
         return Ok(());
     }
     if cli.autostart {
-        hyprlog::internal::debug("CLI", "Handling --autostart flag");
+        log_debug("CLI", "Handling --autostart flag");
         autostart::handle_autostart(&config_ink)?;
         return Ok(());
     }
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
                     .get("bar_plugins_header")
                     .cloned()
                     .unwrap_or_else(|| "Installed Plugins:".to_string());
-                hyprlog::internal::info("PLUGINS", &header_msg);
+                log_info("PLUGINS", &header_msg);
 
                 for (name, entry) in registry.plugins {
                     let status_msg_key = if entry.enabled {
@@ -147,7 +147,7 @@ async fn main() -> Result<()> {
                         .unwrap_or_else(|| {
                             format!("- {}: {} ({})", name, status, entry.path.display())
                         });
-                    hyprlog::internal::info("PLUGINS", &entry_msg);
+                    log_info("PLUGINS", &entry_msg);
 
                     if !entry.metadata.version.is_empty() {
                         let meta_msg = config_ink
@@ -164,7 +164,7 @@ async fn main() -> Result<()> {
                                     entry.metadata.version, entry.metadata.author
                                 )
                             });
-                        hyprlog::internal::info("PLUGINS", &meta_msg);
+                        log_info("PLUGINS", &meta_msg);
 
                         let desc_msg = config_ink
                             .layout
@@ -172,7 +172,7 @@ async fn main() -> Result<()> {
                             .get("bar_plugin_desc")
                             .map(|p| p.replace("{description}", &entry.metadata.description))
                             .unwrap_or_else(|| format!("  {}", entry.metadata.description));
-                        hyprlog::internal::info("PLUGINS", &desc_msg);
+                        log_info("PLUGINS", &desc_msg);
                     }
                 }
                 return Ok(());
@@ -181,14 +181,14 @@ async fn main() -> Result<()> {
                 use hyprbar::modules::registry::Registry;
                 let mut registry = Registry::load()?;
                 registry.enable(name)?;
-                hyprlog::internal::info("PLUGINS", &format!("plugin '{}' enabled", name));
+                log_info("PLUGINS", &format!("plugin '{}' enabled", name));
                 return Ok(());
             }
             Commands::Disable { name } => {
                 use hyprbar::modules::registry::Registry;
                 let mut registry = Registry::load()?;
                 registry.disable(name)?;
-                hyprlog::internal::info("PLUGINS", &format!("plugin '{}' disabled", name));
+                log_info("PLUGINS", &format!("plugin '{}' disabled", name));
                 return Ok(());
             }
         }

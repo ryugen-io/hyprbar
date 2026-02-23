@@ -23,7 +23,7 @@ pub struct Cli {
     #[arg(long)]
     pub restart: bool,
 
-    /// Manage autostart settings (generates script)
+    /// Toggle native Hyprland autostart integration
     #[arg(long)]
     pub autostart: bool,
 }
