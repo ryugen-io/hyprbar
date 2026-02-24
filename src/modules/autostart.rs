@@ -1,14 +1,17 @@
+use crate::config::BarConfig;
 use crate::modules::logging::log_info;
 use anyhow::{Context, Result};
-use hyprink::config::Config;
+use hypr_conf::{
+    collect_source_graph, expand_source_expression_to_path, has_glob_chars, parse_source_value,
+    resolve_source_targets, source_expression_matches_path,
+};
 use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tracing::debug;
 
-pub fn handle_autostart(config_ink: &Arc<Config>) -> Result<()> {
+pub fn handle_autostart(config: &BarConfig) -> Result<()> {
     let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let home_dir = PathBuf::from(home);
     let hypr_dir = home_dir.join(".config").join("hypr");
@@ -53,13 +56,8 @@ pub fn handle_autostart(config_ink: &Arc<Config>) -> Result<()> {
             }
         }
 
-        let msg = config_ink
-            .layout
-            .labels
-            .get("bar_autostart_disabled")
-            .cloned()
-            .unwrap_or_else(|| "Hyprland autostart disabled".to_string());
-        log_info("AUTOSTART", &msg);
+        let msg = config.label("bar_autostart_disabled", "Hyprland autostart disabled");
+        log_info("AUTOSTART", msg);
     } else {
         debug!("Hyprbar autostart is disabled. Enabling...");
 
@@ -88,13 +86,8 @@ pub fn handle_autostart(config_ink: &Arc<Config>) -> Result<()> {
             );
         }
 
-        let msg = config_ink
-            .layout
-            .labels
-            .get("bar_autostart_enabled")
-            .cloned()
-            .unwrap_or_else(|| "Hyprland autostart enabled".to_string());
-        log_info("AUTOSTART", &msg);
+        let msg = config.label("bar_autostart_enabled", "Hyprland autostart enabled");
+        log_info("AUTOSTART", msg);
         log_info(
             "AUTOSTART",
             &format!("Managed include: {}", include_target.display()),
@@ -115,36 +108,7 @@ fn hyprbar_autostart_snippet() -> String {
 }
 
 fn collect_config_graph(root: &Path, home_dir: &Path) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    let mut stack = vec![root.to_path_buf()];
-    let mut seen = HashSet::new();
-
-    while let Some(file) = stack.pop() {
-        let key = file.display().to_string();
-        if !seen.insert(key) {
-            continue;
-        }
-
-        out.push(file.clone());
-
-        let content = match fs::read_to_string(&file) {
-            Ok(content) => content,
-            Err(_) => continue,
-        };
-
-        let base_dir = file.parent().unwrap_or_else(|| Path::new("/"));
-        for line in content.lines() {
-            if let Some(source_value) = parse_source_value(line) {
-                for resolved in resolve_source_targets(source_value, base_dir, home_dir) {
-                    if resolved.exists() && resolved.is_file() {
-                        stack.push(resolved);
-                    }
-                }
-            }
-        }
-    }
-
-    out
+    collect_source_graph(root, home_dir)
 }
 
 fn append_source_line_if_missing(content: &str, source_line: &str, home_dir: &Path) -> String {
@@ -223,16 +187,15 @@ fn collect_globbed_hyprbar_files(source_graph: &[PathBuf], home_dir: &Path) -> H
                 continue;
             };
 
-            let expanded = expand_source_expression(source_value, base_dir, home_dir);
+            let expanded = expand_source_expression_to_path(source_value, base_dir, home_dir);
+            let expanded = expanded.to_string_lossy();
             if !has_glob_chars(&expanded) {
                 continue;
             }
 
-            if let Ok(paths) = glob::glob(&expanded) {
-                for entry in paths.flatten() {
-                    if entry.file_name().and_then(|n| n.to_str()) == Some("hyprbar.conf") {
-                        out.insert(entry);
-                    }
+            for entry in resolve_source_targets(source_value, base_dir, home_dir) {
+                if entry.file_name().and_then(|n| n.to_str()) == Some("hyprbar.conf") {
+                    out.insert(entry);
                 }
             }
         }
@@ -251,12 +214,13 @@ fn find_preferred_glob_target(source_graph: &[PathBuf], home_dir: &Path) -> Opti
                 continue;
             };
 
-            let expanded = expand_source_expression(source_value, base_dir, home_dir);
+            let expanded = expand_source_expression_to_path(source_value, base_dir, home_dir);
+            let expanded = expanded.to_string_lossy();
             if !has_glob_chars(&expanded) {
                 continue;
             }
 
-            let Some(parent) = Path::new(&expanded).parent() else {
+            let Some(parent) = Path::new(expanded.as_ref()).parent() else {
                 continue;
             };
 
@@ -266,9 +230,7 @@ fn find_preferred_glob_target(source_graph: &[PathBuf], home_dir: &Path) -> Opti
             }
 
             let candidate = parent.join("hyprbar.conf");
-            if let Ok(pattern) = glob::Pattern::new(&expanded)
-                && pattern.matches_path(&candidate)
-            {
+            if source_expression_matches_path(source_value, base_dir, home_dir, &candidate) {
                 return Some(candidate);
             }
         }
@@ -290,14 +252,13 @@ fn is_path_covered_by_glob(source_graph: &[PathBuf], home_dir: &Path, target: &P
                 continue;
             };
 
-            let expanded = expand_source_expression(source_value, base_dir, home_dir);
+            let expanded = expand_source_expression_to_path(source_value, base_dir, home_dir);
+            let expanded = expanded.to_string_lossy();
             if !has_glob_chars(&expanded) {
                 continue;
             }
 
-            if let Ok(pattern) = glob::Pattern::new(&expanded)
-                && pattern.matches_path(target)
-            {
+            if source_expression_matches_path(source_value, base_dir, home_dir, target) {
                 return true;
             }
         }
@@ -306,76 +267,12 @@ fn is_path_covered_by_glob(source_graph: &[PathBuf], home_dir: &Path, target: &P
     false
 }
 
-fn parse_source_value(line: &str) -> Option<&str> {
-    let clean = strip_comment(line).trim();
-    if clean.is_empty() {
-        return None;
-    }
-
-    let (lhs, rhs) = clean.split_once('=')?;
-    if lhs.trim() != "source" {
-        return None;
-    }
-
-    let value = rhs.trim().trim_matches('"').trim_matches('\'');
-    if value.is_empty() {
-        return None;
-    }
-
-    Some(value)
-}
-
 fn source_targets_hyprbar(value: &str, base_dir: &Path, home_dir: &Path) -> bool {
-    let expanded = expand_source_expression(value, base_dir, home_dir);
-    if has_glob_chars(&expanded) {
+    if has_glob_chars(value) {
         return false;
     }
 
-    Path::new(&expanded).file_name().and_then(|n| n.to_str()) == Some("hyprbar.conf")
-}
-
-fn resolve_source_targets(value: &str, base_dir: &Path, home_dir: &Path) -> Vec<PathBuf> {
-    let expanded = expand_source_expression(value, base_dir, home_dir);
-
-    if has_glob_chars(&expanded) {
-        match glob::glob(&expanded) {
-            Ok(paths) => paths
-                .flatten()
-                .filter(|path| path.exists() && path.is_file())
-                .collect(),
-            Err(_) => Vec::new(),
-        }
-    } else {
-        vec![PathBuf::from(expanded)]
-    }
-}
-
-fn expand_source_expression(value: &str, base_dir: &Path, home_dir: &Path) -> String {
-    let mut out = value.to_string();
-
-    if let Some(home) = home_dir.to_str() {
-        out = out.replace("${HOME}", home);
-        out = out.replace("$HOME", home);
-    }
-
-    if let Some(rest) = out.strip_prefix("~/") {
-        return home_dir.join(rest).display().to_string();
-    }
-
-    let path = Path::new(&out);
-    if path.is_absolute() {
-        return out;
-    }
-
-    base_dir.join(path).display().to_string()
-}
-
-fn strip_comment(line: &str) -> &str {
-    line.split_once('#')
-        .map(|(before, _)| before)
-        .unwrap_or(line)
-}
-
-fn has_glob_chars(value: &str) -> bool {
-    value.contains('*') || value.contains('?') || value.contains('[')
+    resolve_source_targets(value, base_dir, home_dir)
+        .iter()
+        .any(|path| path.file_name().and_then(|n| n.to_str()) == Some("hyprbar.conf"))
 }
