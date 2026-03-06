@@ -1,4 +1,4 @@
-# hyprbar
+# hyprsbar
 
 A modular Wayland status bar built with ratatui and smithay-client-toolkit.
 
@@ -13,7 +13,7 @@ A modular Wayland status bar built with ratatui and smithay-client-toolkit.
 
 ```
 src/
-├── bin/hyprbar.rs    # CLI entry point
+├── bin/hyprsbar.rs    # CLI entry point
 ├── renderer/         # Rendering logic (modular)
 ├── wayland/          # Wayland layer shell integration
 ├── modules/          # Bootstrap, config, logging
@@ -24,11 +24,21 @@ src/
 ## Widget System
 
 Widgets are dynamic libraries (.so) implementing the `Widget` trait.
-Located in `~/.local/share/hyprbar/widgets/`.
+Located in `~/.local/share/hyprsbar/widgets/`.
 
 ## Configuration
 
-Config file: `~/.config/hypr/hyprbar.conf` (TOML)
+Config file: `~/.config/hypr/hyprsbar.conf` (TOML)
+
+`hyprsbar` reads only `hyprsbar.conf` (metadata `type = bar`).  
+`hyprsink` may generate/update this file, but `hyprsbar` does not load `hyprsink.conf`.
+
+Minimal header:
+
+```conf
+# hypr metadata
+# type = bar
+```
 
 ## Development
 

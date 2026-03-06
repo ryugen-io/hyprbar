@@ -5,29 +5,19 @@ use crate::modules::logging::*;
 use crate::modules::wayland_integration;
 
 use crate::config::BarConfig;
-use hyprink::config::Config;
-use std::sync::Arc;
 
-pub async fn run_server(initial_config_ink: Arc<Config>, initial_config: BarConfig) -> Result<()> {
+pub async fn run_server(initial_config: BarConfig) -> Result<()> {
     log_debug("BAR", "Starting server initialization");
 
-    let (config_ink, config, bar_state, _plugin_manager, mut renderer) =
-        bootstrap::init_application(initial_config_ink, initial_config)
+    let (config, bar_state, _plugin_manager, mut renderer) =
+        bootstrap::init_application(initial_config)
             .await
             .context("Failed to bootstrap application")?;
 
     log_debug("BAR", "Bootstrap complete");
 
-    // Labels fetched now — config_ink is shared via Arc and these strings
-    // are used after the event loop where borrowing would be inconvenient.
-    let get_msg = |key: &str, default: &str| -> String {
-        config_ink
-            .layout
-            .labels
-            .get(key)
-            .cloned()
-            .unwrap_or_else(|| default.to_string())
-    };
+    // Labels are fetched once to avoid repeated map lookups in the hot loop.
+    let get_msg = |key: &str, default: &str| -> String { config.label(key, default).to_string() };
 
     let msg_loop = get_msg("bar_start_loop", "Starting Wayland event loop");
     let msg_exit = get_msg("bar_exit", "Exiting...");

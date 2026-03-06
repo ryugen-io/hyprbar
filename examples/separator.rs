@@ -1,4 +1,4 @@
-use hyprbar::prelude::*;
+use hyprsbar::prelude::*;
 use std::borrow::Cow;
 
 pub struct Separator {

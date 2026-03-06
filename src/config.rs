@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct BarConfig {
@@ -46,7 +47,7 @@ fn default_log_level() -> String {
 }
 
 fn default_debug_filter() -> String {
-    "info,hyprbar=debug".to_string()
+    "info,hyprsbar=debug".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -69,6 +70,9 @@ pub struct LayoutConfig {
     pub strategy: String,
     #[serde(default = "default_layout_padding")]
     pub padding: u16,
+
+    #[serde(default)]
+    pub labels: HashMap<String, String>,
 }
 
 impl Default for LayoutConfig {
@@ -82,6 +86,7 @@ impl Default for LayoutConfig {
             modules_left: vec![],
             modules_center: vec![],
             modules_right: vec![],
+            labels: HashMap::new(),
         }
     }
 }
@@ -275,6 +280,8 @@ pub struct StyleConfig {
     pub font: Option<String>,
     #[serde(default)]
     pub animation: Option<AnimationConfig>,
+    #[serde(default)]
+    pub colors: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -298,6 +305,7 @@ impl Default for StyleConfig {
             error: None,
             font: None,
             animation: None,
+            colors: HashMap::new(),
         }
     }
 }
@@ -308,4 +316,51 @@ fn default_bg() -> String {
 
 fn default_fg() -> String {
     "#FFFFFF".to_string()
+}
+
+impl BarConfig {
+    #[must_use]
+    pub fn label<'a>(&'a self, key: &str, fallback: &'a str) -> &'a str {
+        self.layout
+            .labels
+            .get(key)
+            .map(String::as_str)
+            .unwrap_or(fallback)
+    }
+
+    #[must_use]
+    pub fn color_hex<'a>(&'a self, key: &str) -> Option<&'a str> {
+        if let Some(value) = self.style.colors.get(key) {
+            return Some(value.as_str());
+        }
+
+        match key {
+            "bg" => Some(self.style.bg.as_str()),
+            "fg" => Some(self.style.fg.as_str()),
+            "accent" => self
+                .style
+                .accent
+                .as_deref()
+                .or(self.style.primary.as_deref()),
+            "primary" => self
+                .style
+                .primary
+                .as_deref()
+                .or(self.style.accent.as_deref()),
+            "secondary" => self.style.secondary.as_deref(),
+            "success" => self.style.success.as_deref(),
+            "error" => self.style.error.as_deref(),
+            "window_bg" => self
+                .style
+                .window_bg
+                .as_deref()
+                .or(Some(self.style.bg.as_str())),
+            "popup_bg" => self
+                .style
+                .popup_bg
+                .as_deref()
+                .or(Some(self.style.bg.as_str())),
+            _ => None,
+        }
+    }
 }

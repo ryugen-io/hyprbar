@@ -3,7 +3,7 @@
 //! Author: Ryu
 //! Description: Animated demo showing UI Kit typography variants
 
-use hyprbar::prelude::*;
+use hyprsbar::prelude::*;
 use std::sync::Mutex;
 use tachyonfx::{Effect, EffectTimer, Interpolation, fx};
 
@@ -31,7 +31,7 @@ impl Widget for UiKitDemoWidget {
     fn update(&mut self, _dt: Duration, state: &BarState) {
         let mut effect_lock = self.effect.lock().unwrap();
         if effect_lock.is_none() {
-            let accent = state.config_ink.resolve_color("accent");
+            let accent = state.config.resolve_color("accent");
             // Smooth breathing: fade foreground from accent color over 2.5s, ping-pong loops forever
             *effect_lock = Some(fx::ping_pong(fx::fade_from_fg(
                 accent,
@@ -48,7 +48,7 @@ impl Widget for UiKitDemoWidget {
         // Label must be rendered before the effect so the effect can modify its cells.
         Label::new("UI Kit Demo")
             .variant(TypographyVariant::Accent)
-            .render(area, buf, state.config_ink.as_ref());
+            .render(area, buf, state.config.as_ref());
 
         // Effects that have completed their timer should not keep processing (wastes cycles).
         let mut effect_lock = self.effect.lock().unwrap();

@@ -1,12 +1,11 @@
 use crate::modules::logging::{log_info, log_warn};
 use anyhow::Result;
-use hyprink::config::Config;
 use std::path::Path;
 use tokio::fs;
 
-pub async fn install_widget(path: &Path, _config_ink: &Config) -> Result<()> {
+pub async fn install_widget(path: &Path) -> Result<()> {
     log_info("INSTALL", &format!("Installing widget: {:?}", path));
-    let data_dir = dirs::data_local_dir().unwrap().join("hyprbar/widgets");
+    let data_dir = dirs::data_local_dir().unwrap().join("hyprs/bar/widgets");
     fs::create_dir_all(&data_dir).await?;
 
     let file_name = path

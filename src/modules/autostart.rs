@@ -1,7 +1,7 @@
 use crate::config::BarConfig;
 use crate::modules::logging::log_info;
 use anyhow::{Context, Result};
-use hypr_conf::{
+use hyprs_conf::{
     collect_source_graph, expand_source_expression_to_path, has_glob_chars, parse_source_value,
     resolve_source_targets, source_expression_matches_path,
 };
@@ -16,7 +16,7 @@ pub fn handle_autostart(config: &BarConfig) -> Result<()> {
     let home_dir = PathBuf::from(home);
     let hypr_dir = home_dir.join(".config").join("hypr");
     let hyprland_conf = hypr_dir.join("hyprland.conf");
-    let default_include = hypr_dir.join("hyprbar.conf");
+    let default_include = hypr_dir.join("hyprs/bar.conf");
 
     if !hypr_dir.exists() {
         fs::create_dir_all(&hypr_dir).context("Failed to create Hypr config directory")?;
@@ -24,8 +24,8 @@ pub fn handle_autostart(config: &BarConfig) -> Result<()> {
 
     debug!("Resolving Hyprland source graph from {:?}", hyprland_conf);
     let source_graph = collect_config_graph(&hyprland_conf, &home_dir);
-    let explicit_sources = collect_explicit_hyprbar_sources(&source_graph, &home_dir);
-    let glob_sources = collect_globbed_hyprbar_files(&source_graph, &home_dir);
+    let explicit_sources = collect_explicit_hyprsbar_sources(&source_graph, &home_dir);
+    let glob_sources = collect_globbed_hyprsbar_files(&source_graph, &home_dir);
     let enabled = !explicit_sources.is_empty() || !glob_sources.is_empty();
 
     if enabled {
@@ -37,7 +37,7 @@ pub fn handle_autostart(config: &BarConfig) -> Result<()> {
 
         for file in &source_graph {
             if let Ok(content) = fs::read_to_string(file) {
-                let cleaned = remove_explicit_hyprbar_source_lines(
+                let cleaned = remove_explicit_hyprsbar_source_lines(
                     &content,
                     file.parent().unwrap_or_else(|| Path::new("/")),
                     &home_dir,
@@ -68,7 +68,7 @@ pub fn handle_autostart(config: &BarConfig) -> Result<()> {
                 .with_context(|| format!("Failed to create include dir {:?}", parent))?;
         }
 
-        fs::write(&include_target, hyprbar_autostart_snippet())
+        fs::write(&include_target, hyprsbar_autostart_snippet())
             .with_context(|| format!("Failed to write include file {:?}", include_target))?;
 
         let covered_by_existing_glob =
@@ -97,11 +97,11 @@ pub fn handle_autostart(config: &BarConfig) -> Result<()> {
     Ok(())
 }
 
-fn hyprbar_autostart_snippet() -> String {
+fn hyprsbar_autostart_snippet() -> String {
     [
-        "# Managed by hyprbar --autostart",
-        "# Toggle off by running hyprbar --autostart again",
-        "exec-once = hyprbar --start",
+        "# Managed by hyprsbar --autostart",
+        "# Toggle off by running hyprsbar --autostart again",
+        "exec-once = hyprsbar --start",
         "",
     ]
     .join("\n")
@@ -116,7 +116,7 @@ fn append_source_line_if_missing(content: &str, source_line: &str, home_dir: &Pa
 
     if content.lines().any(|line| {
         parse_source_value(line)
-            .map(|value| source_targets_hyprbar(value, &base, home_dir))
+            .map(|value| source_targets_hyprsbar(value, &base, home_dir))
             .unwrap_or(false)
     }) {
         return content.to_string();
@@ -131,11 +131,11 @@ fn append_source_line_if_missing(content: &str, source_line: &str, home_dir: &Pa
     out
 }
 
-fn remove_explicit_hyprbar_source_lines(content: &str, base_dir: &Path, home_dir: &Path) -> String {
+fn remove_explicit_hyprsbar_source_lines(content: &str, base_dir: &Path, home_dir: &Path) -> String {
     let mut out = String::new();
     for line in content.lines() {
         let drop_line = parse_source_value(line)
-            .map(|value| source_targets_hyprbar(value, base_dir, home_dir))
+            .map(|value| source_targets_hyprsbar(value, base_dir, home_dir))
             .unwrap_or(false);
 
         if !drop_line {
@@ -146,7 +146,7 @@ fn remove_explicit_hyprbar_source_lines(content: &str, base_dir: &Path, home_dir
     out
 }
 
-fn collect_explicit_hyprbar_sources(source_graph: &[PathBuf], home_dir: &Path) -> HashSet<PathBuf> {
+fn collect_explicit_hyprsbar_sources(source_graph: &[PathBuf], home_dir: &Path) -> HashSet<PathBuf> {
     let mut out = HashSet::new();
 
     for file in source_graph {
@@ -158,10 +158,10 @@ fn collect_explicit_hyprbar_sources(source_graph: &[PathBuf], home_dir: &Path) -
         let base_dir = file.parent().unwrap_or_else(|| Path::new("/"));
         for line in content.lines() {
             if let Some(source_value) = parse_source_value(line)
-                && source_targets_hyprbar(source_value, base_dir, home_dir)
+                && source_targets_hyprsbar(source_value, base_dir, home_dir)
             {
                 for target in resolve_source_targets(source_value, base_dir, home_dir) {
-                    if target.file_name().and_then(|n| n.to_str()) == Some("hyprbar.conf") {
+                    if target.file_name().and_then(|n| n.to_str()) == Some("bar.conf") {
                         out.insert(target);
                     }
                 }
@@ -172,7 +172,7 @@ fn collect_explicit_hyprbar_sources(source_graph: &[PathBuf], home_dir: &Path) -
     out
 }
 
-fn collect_globbed_hyprbar_files(source_graph: &[PathBuf], home_dir: &Path) -> HashSet<PathBuf> {
+fn collect_globbed_hyprsbar_files(source_graph: &[PathBuf], home_dir: &Path) -> HashSet<PathBuf> {
     let mut out = HashSet::new();
 
     for file in source_graph {
@@ -194,7 +194,7 @@ fn collect_globbed_hyprbar_files(source_graph: &[PathBuf], home_dir: &Path) -> H
             }
 
             for entry in resolve_source_targets(source_value, base_dir, home_dir) {
-                if entry.file_name().and_then(|n| n.to_str()) == Some("hyprbar.conf") {
+                if entry.file_name().and_then(|n| n.to_str()) == Some("bar.conf") {
                     out.insert(entry);
                 }
             }
@@ -229,7 +229,7 @@ fn find_preferred_glob_target(source_graph: &[PathBuf], home_dir: &Path) -> Opti
                 continue;
             }
 
-            let candidate = parent.join("hyprbar.conf");
+            let candidate = parent.join("bar.conf");
             if source_expression_matches_path(source_value, base_dir, home_dir, &candidate) {
                 return Some(candidate);
             }
@@ -267,12 +267,12 @@ fn is_path_covered_by_glob(source_graph: &[PathBuf], home_dir: &Path, target: &P
     false
 }
 
-fn source_targets_hyprbar(value: &str, base_dir: &Path, home_dir: &Path) -> bool {
+fn source_targets_hyprsbar(value: &str, base_dir: &Path, home_dir: &Path) -> bool {
     if has_glob_chars(value) {
         return false;
     }
 
     resolve_source_targets(value, base_dir, home_dir)
         .iter()
-        .any(|path| path.file_name().and_then(|n| n.to_str()) == Some("hyprbar.conf"))
+        .any(|path| path.file_name().and_then(|n| n.to_str()) == Some("bar.conf"))
 }

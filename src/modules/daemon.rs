@@ -1,7 +1,7 @@
+use crate::config::BarConfig;
 use crate::modules::config::{get_pid_file_path, get_socket_path};
 use crate::modules::logging::{log_debug, log_info, log_warn};
 use anyhow::{Context, Result};
-use hyprink::config::Config;
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use procfs::process::Process;
@@ -9,12 +9,11 @@ use std::env;
 use std::fs;
 use std::io::Write;
 use std::process::Stdio;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
 
-pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<()> {
+pub async fn spawn_bar_daemon(config: &BarConfig, debug: bool) -> Result<()> {
     let self_exe = env::current_exe().context("Failed to get current executable path")?;
     let pid_file_path = get_pid_file_path();
 
@@ -24,22 +23,14 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
         && let Ok(pid) = pid_str.trim().parse::<u32>()
     {
         if let Ok(_proc) = Process::new(pid as i32) {
-            let msg = config_ink
-                .layout
-                .labels
-                .get("bar_running")
-                .map(|p| p.replace("{pid}", &pid.to_string()))
-                .unwrap_or_else(|| format!("daemon running (pid: {})", pid));
+            let msg = config
+                .label("bar_running", "daemon running (pid: {pid})")
+                .replace("{pid}", &pid.to_string());
             log_info("DAEMON", &msg);
             return Ok(());
         } else {
-            let msg = config_ink
-                .layout
-                .labels
-                .get("bar_stale")
-                .cloned()
-                .unwrap_or_else(|| "stale pid file cleaned".to_string());
-            log_warn("DAEMON", &msg);
+            let msg = config.label("bar_stale", "stale pid file cleaned");
+            log_warn("DAEMON", msg);
             fs::remove_file(&pid_file_path).ok(); // Ignore error if cannot remove
         }
     }
@@ -64,17 +55,14 @@ pub async fn spawn_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<(
         .context(format!("Failed to create PID file at {:?}", pid_file_path))?;
     writeln!(file, "{}", pid).context("Failed to write PID to file")?;
 
-    let msg = config_ink
-        .layout
-        .labels
-        .get("bar_start")
-        .map(|p| p.replace("{pid}", &pid.to_string()))
-        .unwrap_or_else(|| format!("daemon started (pid: {})", pid));
+    let msg = config
+        .label("bar_start", "daemon started (pid: {pid})")
+        .replace("{pid}", &pid.to_string());
     log_info("DAEMON", &msg);
     Ok(())
 }
 
-pub async fn terminate_bar_daemon(config_ink: &Arc<Config>) -> Result<()> {
+pub async fn terminate_bar_daemon(config: &BarConfig) -> Result<()> {
     let pid_file_path = get_pid_file_path();
 
     if pid_file_path.exists() {
@@ -95,45 +83,32 @@ pub async fn terminate_bar_daemon(config_ink: &Arc<Config>) -> Result<()> {
         fs::remove_file(&pid_file_path)
             .context(format!("Failed to remove PID file at {:?}", pid_file_path))?;
 
-        let msg = config_ink
-            .layout
-            .labels
-            .get("bar_stop")
-            .map(|p| p.replace("{pid}", &pid.to_string()))
-            .unwrap_or_else(|| format!("daemon terminated (pid: {})", pid));
+        let msg = config
+            .label("bar_stop", "daemon terminated (pid: {pid})")
+            .replace("{pid}", &pid.to_string());
         log_info("DAEMON", &msg);
     } else {
-        let msg = config_ink
-            .layout
-            .labels
-            .get("bar_not_found")
-            .cloned()
-            .unwrap_or_else(|| "no daemon found".to_string());
-        log_info("DAEMON", &msg);
+        let msg = config.label("bar_not_found", "no daemon found");
+        log_info("DAEMON", msg);
     }
     Ok(())
 }
 
-pub async fn restart_bar_daemon(config_ink: &Arc<Config>, debug: bool) -> Result<()> {
-    let msg = config_ink
-        .layout
-        .labels
-        .get("bar_restart")
-        .cloned()
-        .unwrap_or_else(|| "restarting daemon...".to_string());
-    log_info("DAEMON", &msg);
+pub async fn restart_bar_daemon(config: &BarConfig, debug: bool) -> Result<()> {
+    let msg = config.label("bar_restart", "restarting daemon...");
+    log_info("DAEMON", msg);
 
-    terminate_bar_daemon(config_ink)
+    terminate_bar_daemon(config)
         .await
         .context("Failed to terminate daemon for restart")?;
     sleep(Duration::from_millis(100)).await;
-    spawn_bar_daemon(config_ink, debug)
+    spawn_bar_daemon(config, debug)
         .await
         .context("Failed to spawn daemon for restart")?;
     Ok(())
 }
 
-pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
+pub fn spawn_debug_viewer(config: &BarConfig) -> Result<()> {
     let socket_path = get_socket_path();
 
     // Multiple viewers on the same socket would duplicate output.
@@ -167,13 +142,8 @@ pub fn spawn_debug_viewer(config_ink: &Arc<Config>) -> Result<()> {
 
         log_info("DAEMON", "Debug viewer spawned");
     } else {
-        let msg = config_ink
-            .layout
-            .labels
-            .get("bar_term_error")
-            .cloned()
-            .unwrap_or_else(|| "no compatible terminal found for debug".to_string());
-        log_warn("DAEMON", &msg);
+        let msg = config.label("bar_term_error", "no compatible terminal found for debug");
+        log_warn("DAEMON", msg);
     }
 
     Ok(())

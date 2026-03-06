@@ -91,7 +91,7 @@ pub fn handle_wayland_events(
             wayland_state.draw(
                 &qh,
                 renderer.buffer(),
-                &bar_state.config_ink,
+                &bar_state.config,
                 config
                     .style
                     .window_bg
@@ -143,7 +143,7 @@ pub fn handle_wayland_events(
         wayland_state.draw(
             &qh,
             renderer.buffer(),
-            &bar_state.config_ink,
+            &bar_state.config,
             config
                 .style
                 .window_bg
@@ -217,7 +217,7 @@ fn handle_popup_lifecycle(
         && let Some(buf) = renderer.render_popup(bar_state)
     {
         let bg = config.style.popup_bg.as_deref().unwrap_or(&config.style.bg);
-        wayland_state.draw_popup(qh, buf, &bar_state.config_ink, bg)?;
+        wayland_state.draw_popup(qh, buf, &bar_state.config, bg)?;
     }
 
     Ok(())

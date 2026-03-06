@@ -1,11 +1,11 @@
 [package]
-name = "hyprbar"
+name = "hyprsbar"
 description = "Wayland status bar for Hyprland"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 license = "MIT"
-repository = "https://github.com/ryugen-io/hyprbar"
+repository = "https://github.com/ryugen-io/hyprsbar"
 autoexamples = false
 
 [features]
@@ -13,18 +13,17 @@ default = ["cli"]
 cli = ["dep:clap"]
 
 [lib]
-name = "hyprbar"
+name = "hyprsbar"
 
 [[bin]]
-name = "hyprbar"
-path = "src/bin/hyprbar.rs"
+name = "hyprsbar"
+path = "src/bin/hyprsbar.rs"
 required-features = ["cli"]
 
 [dependencies]
 # Hypr ecosystem
-hypr-conf = { git = "https://github.com/ryugen-io/hypr-conf.git", branch = "main" }
-hyprink = { git = "ssh://git@github.com/ryugen-io/hyprink.git", branch = "master", default-features = false }
-hyprlog = { git = "ssh://git@github.com/ryugen-io/hyprlog.git", branch = "main", default-features = false }
+hyprs-conf = { git = "https://github.com/ryugen-io/hyprs-conf.git", branch = "main" }
+hyprs-log = { git = "ssh://git@github.com/ryugen-io/hyprs-log.git", branch = "main", default-features = false }
 
 # Core
 ratatui = "*"
@@ -63,11 +62,10 @@ dirs = "*"
 postcard = { version = "*", features = ["alloc"] }
 serde_json = "*"
 procfs = "*"
-nix = { version = "*", features = ["signal"] }
+nix = { version = "0.31.1", features = ["signal"] }
 glob = "*"
 
 [dev-dependencies]
-tempfile = "*"
 criterion = { version = "*", features = ["html_reports"] }
 
 [profile.release]

@@ -11,7 +11,6 @@ use crate::modules::logging::*;
 use crate::state::BarState;
 use crate::widget::Widget;
 use anyhow::Result;
-use hyprink::config::Config;
 use ratatui::prelude::*;
 use std::time::Duration;
 use tachyonfx::{Effect, Interpolation, fx};
@@ -36,7 +35,6 @@ impl BarRenderer {
         width: u16,
         height: u16,
         config: &BarConfig,
-        config_ink: &Config,
         provider: &dyn crate::widget::WidgetProvider,
     ) -> Self {
         log_debug(
@@ -75,14 +73,11 @@ impl BarRenderer {
         }
 
         log_debug("RENDER", "Initializing left widgets");
-        let left_widgets =
-            Self::init_widgets(&config.layout.modules_left, config, config_ink, provider);
+        let left_widgets = Self::init_widgets(&config.layout.modules_left, config, provider);
         log_debug("RENDER", "Initializing center widgets");
-        let center_widgets =
-            Self::init_widgets(&config.layout.modules_center, config, config_ink, provider);
+        let center_widgets = Self::init_widgets(&config.layout.modules_center, config, provider);
         log_debug("RENDER", "Initializing right widgets");
-        let right_widgets =
-            Self::init_widgets(&config.layout.modules_right, config, config_ink, provider);
+        let right_widgets = Self::init_widgets(&config.layout.modules_right, config, provider);
 
         let total_widgets = left_widgets.len() + center_widgets.len() + right_widgets.len();
         log_info(

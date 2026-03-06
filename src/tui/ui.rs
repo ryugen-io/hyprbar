@@ -68,7 +68,7 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(2), // Status line needs exactly 2 rows for the indicator + spacing.
-            Constraint::Min(0),    // Menu items expand to fill — avoids dead space below short lists.
+            Constraint::Min(0), // Menu items expand to fill — avoids dead space below short lists.
         ])
         .split(area);
 

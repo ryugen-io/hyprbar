@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2155
 # =============================================================================
-# Hyprbar Install Script
+# hyprsbar Install Script
 # Sets up config directory and installs binaries
 # =============================================================================
 
@@ -14,12 +14,12 @@ shopt -s inherit_errexit 2>/dev/null || true
 # -----------------------------------------------------------------------------
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
 readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
-readonly DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hyprbar"
-readonly INSTALL_DIR="${HOME}/.local/bin"
+readonly DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hyprs/bar"
+readonly INSTALL_DIR="${HOME}/.local/bin/hyprs"
 
 # Project Specifics
-readonly BIN_NAME="hyprbar"
-readonly TARGET_NAME="hyprbar"
+readonly BIN_NAME="hyprsbar"
+readonly TARGET_NAME="hyprsbar"
 
 # Colors (Sweet Dracula palette - 24-bit true color)
 readonly GREEN=$'\033[38;2;80;250;123m'
@@ -154,16 +154,16 @@ install_from_source() {
 }
 
 main() {
-    echo -e "${PURPLE}[hyprbar]${NC} INSTALL  starting installation"
+    echo -e "${PURPLE}[hyprsbar]${NC} INSTALL  starting installation"
 
     # Directories
     create_dir "$CONFIG_DIR"
     create_dir "$DATA_DIR"
-    create_dir "$DATA_DIR/widgets"
+    mkdir -p "$DATA_DIR/widgets"
     create_dir "$INSTALL_DIR"
 
     # Configs
-    write_config "${CONFIG_DIR}/hyprbar.conf" "$HYPRBAR_CONFIG"
+    write_config "${CONFIG_DIR}/hyprs/bar.conf" "$HYPRBAR_CONFIG"
 
     # Install
     install_from_source

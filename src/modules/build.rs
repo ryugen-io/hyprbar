@@ -1,12 +1,11 @@
 use crate::modules::logging::{log_debug, log_info};
 use anyhow::{Context, Result};
-use hyprink::config::Config;
 use std::path::Path;
 use std::process::Stdio;
 use tokio::fs;
 use tokio::process::Command;
 
-pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
+pub async fn compile_widget(path: &Path) -> Result<()> {
     log_info("BUILD", &format!("Compiling widget: {:?}", path));
 
     if !path.exists() {
@@ -20,7 +19,7 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
 
     // Isolated temp dir prevents cross-contamination between concurrent builds
     // and avoids stale artifacts from previous failed builds.
-    let temp_dir = std::env::temp_dir().join(format!("hyprbar_build_{}", widget_name));
+    let temp_dir = std::env::temp_dir().join(format!("hyprsbar_build_{}", widget_name));
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir).await?;
     }
@@ -50,22 +49,22 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
         fs::write(&cargo_toml_path, cargo_toml).await?;
     }
 
-    // Plugins need hyprbar for Widget trait + prelude, ratatui for rendering,
+    // Plugins need hyprsbar for Widget trait + prelude, ratatui for rendering,
     // tachyonfx for visual effects. These are always needed regardless of widget.
-    let hyprbar_path = std::env::current_dir()?;
+    let hyprsbar_path = std::env::current_dir()?;
 
     let status = Command::new("cargo")
         .arg("add")
-        .arg("hyprbar")
+        .arg("hyprsbar")
         .arg("--path")
-        .arg(&hyprbar_path)
+        .arg(&hyprsbar_path)
         .current_dir(&temp_dir)
         .status()
         .await
-        .context("Failed to add hyprbar dependency")?;
+        .context("Failed to add hyprsbar dependency")?;
 
     if !status.success() {
-        return Err(anyhow::anyhow!("Failed to add hyprbar"));
+        return Err(anyhow::anyhow!("Failed to add hyprsbar"));
     }
 
     let status = Command::new("cargo")
@@ -183,7 +182,7 @@ pub async fn compile_widget(path: &Path, _config_ink: &Config) -> Result<()> {
 
     let widgets_dir = dirs::data_local_dir()
         .ok_or_else(|| anyhow::anyhow!("Cannot determine XDG data directory"))?
-        .join("hyprbar/widgets");
+        .join("hyprs/bar/widgets");
 
     fs::create_dir_all(&widgets_dir).await?;
 

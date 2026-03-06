@@ -92,7 +92,7 @@ pub fn init(
         &qh,
         surface.clone(),
         Layer::Top,
-        Some("hyprbar"),
+        Some("hyprsbar"),
         output.as_ref(),
     );
 
@@ -137,7 +137,7 @@ pub fn create_popup_surface(
         qh,
         popup_wl_surface.clone(),
         Layer::Overlay,
-        Some("hyprbar-popup"),
+        Some("hyprsbar-popup"),
         None, // Same output as main surface
     );
 

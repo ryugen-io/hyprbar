@@ -1,6 +1,6 @@
+use crate::config::BarConfig;
 use crate::wayland::blitter::blit_buffer_to_pixels;
 use anyhow::Context;
-use hyprink::config::Config;
 use ratatui::buffer::Buffer;
 use smithay_client_toolkit::reexports::client::protocol::wl_shm;
 use smithay_client_toolkit::shell::wlr_layer::LayerSurface;
@@ -59,7 +59,7 @@ impl WaylandState {
         &mut self,
         _qh: &QueueHandle<Self>,
         buffer: &Buffer,
-        config_ink: &Config,
+        config: &BarConfig,
         bg_color_hex: &str,
     ) -> anyhow::Result<()> {
         let width = self.width;
@@ -88,7 +88,7 @@ impl WaylandState {
             canvas,
             width,
             height,
-            config_ink,
+            config,
             &mut self.text_renderer,
             bg_color_hex,
         );
@@ -109,7 +109,7 @@ impl WaylandState {
         &mut self,
         _qh: &QueueHandle<Self>,
         buffer: &Buffer,
-        config_ink: &Config,
+        config: &BarConfig,
         bg_color_hex: &str,
     ) -> anyhow::Result<()> {
         let width = self.popup_width;
@@ -139,7 +139,7 @@ impl WaylandState {
             canvas,
             width,
             height,
-            config_ink,
+            config,
             &mut self.text_renderer,
             bg_color_hex,
         );

@@ -2,24 +2,17 @@ use super::BarRenderer;
 use crate::config::BarConfig;
 use crate::modules::logging::*;
 use crate::widget::Widget;
-use hyprink::config::Config;
 
 impl BarRenderer {
     pub(crate) fn init_widgets(
         names: &[String],
-        _config: &BarConfig,
-        config_ink: &Config,
+        config: &BarConfig,
         provider: &dyn crate::widget::WidgetProvider,
     ) -> Vec<Box<dyn Widget>> {
         log_debug("WIDGET", &format!("Initializing {} widgets", names.len()));
 
         let mut widgets: Vec<Box<dyn Widget>> = Vec::new();
-        let log_fmt = config_ink
-            .layout
-            .labels
-            .get("widget_loaded")
-            .cloned()
-            .unwrap_or_else(|| "Loaded Dish: {0} (Type: {1})".to_string());
+        let log_fmt = config.label("widget_loaded", "Loaded Dish: {0} (Type: {1})");
 
         for raw_name in names {
             log_debug("WIDGET", &format!("Parsing widget spec: {}", raw_name));

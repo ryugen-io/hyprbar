@@ -1,22 +1,16 @@
-use crate::config::BarConfig;
-use hyprink::config::Config;
-
 use std::sync::Arc;
+
+use crate::config::BarConfig;
 
 #[derive(Debug, Clone)]
 pub struct BarState {
-    pub config_ink: Arc<Config>,
-    pub config: BarConfig,
+    pub config: Arc<BarConfig>,
     pub bus: crate::bus::EventBus,
 }
 
 impl BarState {
-    pub fn new(config_ink: Arc<Config>, config: BarConfig) -> Self {
+    pub fn new(config: Arc<BarConfig>) -> Self {
         let bus = crate::bus::EventBus::new();
-        Self {
-            config_ink,
-            config,
-            bus,
-        }
+        Self { config, bus }
     }
 }

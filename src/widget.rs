@@ -35,7 +35,7 @@ impl PopupRequest {
     }
 }
 
-/// A Widget is a renderable component for the hyprbar bar.
+/// A Widget is a renderable component for the hyprsbar bar.
 pub trait Widget: Send + Sync {
     fn name(&self) -> &str;
     fn render(&mut self, area: Rect, buf: &mut Buffer, state: &BarState, dt: std::time::Duration);

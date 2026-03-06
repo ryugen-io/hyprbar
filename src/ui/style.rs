@@ -1,5 +1,5 @@
-use hyprink::config::Config;
-use hyprink::factory::ColorResolver;
+use crate::config::BarConfig;
+use crate::theme::ColorResolver;
 use ratatui::style::Color;
 
 pub trait ThemeExt {
@@ -7,15 +7,10 @@ pub trait ThemeExt {
     fn resolve_bg(&self, key: &str) -> Color;
 }
 
-impl ThemeExt for Config {
+impl ThemeExt for BarConfig {
     fn resolve_color(&self, key: &str) -> Color {
-        self.theme
-            .colors
-            .get(key)
-            .map(|s| {
-                let c = ColorResolver::hex_to_color(s);
-                Color::Rgb(c.r, c.g, c.b)
-            })
+        self.color_hex(key)
+            .map(ColorResolver::hex_to_ratatui)
             .unwrap_or(Color::Reset)
     }
 

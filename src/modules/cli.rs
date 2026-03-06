@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(name = "hyprbar", version, about = "Wayland status bar for Hyprland")]
+#[command(name = "hyprsbar", version, about = "Wayland status bar for Hyprland")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,

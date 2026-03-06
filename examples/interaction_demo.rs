@@ -4,7 +4,7 @@
 //! Description: Demo showing click, hover, and scroll handling
 //! Has-Popup: true
 
-use hyprbar::prelude::*;
+use hyprsbar::prelude::*;
 use std::sync::Mutex;
 
 pub struct InteractionDemoWidget {
@@ -113,7 +113,7 @@ impl Widget for InteractionDemoWidget {
 
         Label::new(&text)
             .variant(variant)
-            .render(area, buf, state.config_ink.as_ref());
+            .render(area, buf, state.config.as_ref());
     }
 
     fn popup_request(&self) -> Option<PopupRequest> {
@@ -146,7 +146,7 @@ impl Widget for InteractionDemoWidget {
             let y = area.y + i as u16;
             Label::new(line)
                 .variant(TypographyVariant::Body)
-                .render(Rect::new(area.x, y, area.width, 1), buf, state.config_ink.as_ref());
+                .render(Rect::new(area.x, y, area.width, 1), buf, state.config.as_ref());
         }
     }
 }

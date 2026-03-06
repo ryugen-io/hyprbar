@@ -2,14 +2,13 @@ use anyhow::Context;
 use colored::Colorize;
 use std::collections::VecDeque;
 use std::fs;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock};
 use tokio::io::AsyncWriteExt;
 use tokio::net::UnixListener;
 use tokio::sync::broadcast;
 use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
-use hyprink::config::Config;
-use hyprlog::Logger;
+use hyprs_log::Logger;
 
 use crate::modules::config::get_socket_path;
 
@@ -22,22 +21,22 @@ pub static HYPRLOG: OnceLock<Logger> = OnceLock::new();
 
 /// Dual output ensures log messages reach both persistent storage and live debug viewers.
 pub fn log_info(scope: &str, msg: &str) {
-    log_with_hyprlog(Level::Info, scope, msg);
+    log_with_hyprs_log(Level::Info, scope, msg);
     broadcast_log("INFO", scope, msg);
 }
 
 pub fn log_debug(scope: &str, msg: &str) {
-    log_with_hyprlog(Level::Debug, scope, msg);
+    log_with_hyprs_log(Level::Debug, scope, msg);
     broadcast_log("DEBUG", scope, msg);
 }
 
 pub fn log_warn(scope: &str, msg: &str) {
-    log_with_hyprlog(Level::Warn, scope, msg);
+    log_with_hyprs_log(Level::Warn, scope, msg);
     broadcast_log("WARN", scope, msg);
 }
 
 pub fn log_error(scope: &str, msg: &str) {
-    log_with_hyprlog(Level::Error, scope, msg);
+    log_with_hyprs_log(Level::Error, scope, msg);
     broadcast_log("ERROR", scope, msg);
 }
 
@@ -49,9 +48,9 @@ enum Level {
     Error,
 }
 
-// Use the configured hyprlog logger as the primary sink.
+// Use the configured hyprs_log logger as the primary sink.
 // Fallback keeps early-start logs visible before init_logging() runs.
-fn log_with_hyprlog(level: Level, scope: &str, msg: &str) {
+fn log_with_hyprs_log(level: Level, scope: &str, msg: &str) {
     if let Some(logger) = HYPRLOG.get() {
         match level {
             Level::Info => logger.info(scope, msg),
@@ -61,10 +60,10 @@ fn log_with_hyprlog(level: Level, scope: &str, msg: &str) {
         }
     } else {
         match level {
-            Level::Info => hyprlog::internal::info(scope, msg),
-            Level::Debug => hyprlog::internal::debug(scope, msg),
-            Level::Warn => hyprlog::internal::warn(scope, msg),
-            Level::Error => hyprlog::internal::error(scope, msg),
+            Level::Info => hyprs_log::internal::info(scope, msg),
+            Level::Debug => hyprs_log::internal::debug(scope, msg),
+            Level::Warn => hyprs_log::internal::warn(scope, msg),
+            Level::Error => hyprs_log::internal::error(scope, msg),
         }
     }
 }
@@ -104,7 +103,7 @@ fn broadcast_log(level: &str, scope: &str, msg: &str) {
 
 struct SocketSubscriberLayer;
 
-/// Tracing's subscriber model requires a Layer to bridge events into hyprlog's file-based API.
+/// Tracing's subscriber model requires a Layer to bridge events into hyprs_log's file-based API.
 struct HyprlogLayer;
 
 impl<S> Layer<S> for HyprlogLayer
@@ -142,7 +141,7 @@ where
         let message = visitor.0;
 
         let target = metadata.target();
-        let scope = if target.starts_with("hyprbar") {
+        let scope = if target.starts_with("hyprsbar") {
             "HYPRBAR"
         } else {
             target
@@ -218,7 +217,6 @@ where
 }
 
 pub fn init_logging(
-    _config_ink: Arc<Config>,
     enable_debug: bool,
     config_level: &str,
     config_filter: &str,
@@ -273,17 +271,17 @@ pub fn init_logging(
     };
 
     HYPRLOG
-        .set(Logger::from_config("hyprbar"))
-        .map_err(|_| anyhow::anyhow!("Failed to set hyprlog logger"))?;
+        .set(Logger::from_config("hyprsbar"))
+        .map_err(|_| anyhow::anyhow!("Failed to set hyprs_log logger"))?;
 
-    let hyprlog_layer = HyprlogLayer;
+    let hyprs_log_layer = HyprlogLayer;
 
     tracing_subscriber::registry()
         .with(env_filter)
         .with(fmt_layer)
         .with(socket_layer)
         .with(publisher_layer)
-        .with(hyprlog_layer)
+        .with(hyprs_log_layer)
         .init();
 
     // Only the daemon owns the socket — CLI processes connect as clients above.

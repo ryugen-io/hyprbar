@@ -5,7 +5,7 @@
 //! Dependency: chrono = "0.4"
 
 use chrono::Local;
-use hyprbar::prelude::*;
+use hyprsbar::prelude::*;
 
 /// Configuration keys for [dish.datetime] in sink.toml
 struct DateTimeConfig {
@@ -257,7 +257,7 @@ impl Widget for DateTimeWidget {
         // Label handles theme-aware styling and alignment internally.
         Label::new(&self.cached_display)
             .variant(TypographyVariant::Body)
-            .render(area, buf, state.config_ink.as_ref());
+            .render(area, buf, state.config.as_ref());
     }
 }
 

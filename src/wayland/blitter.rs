@@ -1,7 +1,7 @@
+use crate::config::BarConfig;
+use crate::theme::ColorResolver;
 use crate::wayland::text::TextRenderer;
 use cosmic_text::{Attrs, Buffer, Color as CosmicColor, Family, Metrics, Shaping};
-use hyprink::config::Config;
-use hyprink::factory::ColorResolver;
 
 use ratatui::buffer::Buffer as RatatuiBuffer;
 use ratatui::style::Color;
@@ -11,7 +11,7 @@ pub fn blit_buffer_to_pixels(
     pixels: &mut [u8],
     width: u32,
     height: u32,
-    config_ink: &Config,
+    config: &BarConfig,
     text_renderer: &mut TextRenderer, // Mutable for SwashCache/FontSystem
     bg_color_hex: &str,
 ) {
@@ -74,7 +74,7 @@ pub fn blit_buffer_to_pixels(
                     current_fg,
                     current_bg,
                     text_renderer,
-                    config_ink,
+                    config,
                     pixels,
                     fb_width,
                     fb_height,
@@ -104,7 +104,7 @@ pub fn blit_buffer_to_pixels(
                 current_fg,
                 current_bg,
                 text_renderer,
-                config_ink,
+                config,
                 pixels,
                 fb_width,
                 fb_height,
@@ -128,7 +128,7 @@ fn flush_run(
     fg: Color,
     bg: Color,
     text_renderer: &mut TextRenderer,
-    config_ink: &Config,
+    config: &BarConfig,
     pixels: &mut [u8],
     width: usize,
     height: usize,
@@ -139,8 +139,8 @@ fn flush_run(
     _default_bg_g: u8,
     _default_bg_b: u8,
 ) {
-    let resolved_fg = resolve_color(fg, config_ink, Color::White);
-    let resolved_bg = resolve_color(bg, config_ink, Color::Reset); // Reset means transparent/default
+    let resolved_fg = resolve_color(fg, config, Color::White);
+    let resolved_bg = resolve_color(bg, config, Color::Reset); // Reset means transparent/default
 
     // Color resolution can silently fall through to defaults — enable tracing to diagnose theme mismatches.
 
@@ -246,19 +246,14 @@ fn flush_run(
     );
 }
 
-fn resolve_color(c: Color, config_ink: &Config, default: Color) -> Color {
+fn resolve_color(c: Color, config: &BarConfig, default: Color) -> Color {
     match c {
         Color::Reset => {
             if default == Color::White {
                 // Reset means "use theme default", not literal black.
-                config_ink
-                    .theme
-                    .colors
-                    .get("fg")
-                    .map(|s| {
-                        let cc = ColorResolver::hex_to_color(s);
-                        Color::Rgb(cc.r, cc.g, cc.b)
-                    })
+                config
+                    .color_hex("fg")
+                    .map(ColorResolver::hex_to_ratatui)
                     .unwrap_or(Color::White)
             } else {
                 default

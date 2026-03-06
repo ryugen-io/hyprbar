@@ -1,9 +1,9 @@
 //! Name: Tray Space
 //! Version: 1.0.0
-//! Author: hyprbar contributors
+//! Author: hyprsbar contributors
 //! Description: A widget that provides space for tray icons
 
-use hyprbar::prelude::*;
+use hyprsbar::prelude::*;
 
 /// TraySpace provides a reserved area for system tray icons
 pub struct TraySpaceWidget {
@@ -174,7 +174,7 @@ impl Widget for TraySpaceWidget {
 
         Label::new(&display)
             .variant(TypographyVariant::Body)
-            .render(area, buf, state.config_ink.as_ref());
+            .render(area, buf, state.config.as_ref());
     }
 }
 

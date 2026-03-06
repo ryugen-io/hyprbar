@@ -3,7 +3,7 @@
 //! Author: Ryu
 //! Description: Shows battery status with configurable colors
 
-use hyprbar::prelude::*;
+use hyprsbar::prelude::*;
 use std::sync::Mutex;
 use tachyonfx::{Effect, Interpolation, Motion, fx, pattern::SweepPattern};
 
@@ -72,10 +72,10 @@ impl BatteryWidget {
                 let c = ColorResolver::hex_to_color(hex);
                 Color::Rgb(c.r, c.g, c.b)
             } else {
-                state.config_ink.resolve_color("accent")
+                state.config.resolve_color("accent")
             };
 
-            let low_color = state.config_ink.resolve_color("error");
+            let low_color = state.config.resolve_color("error");
 
             *self.effect.lock().unwrap() = match current_state {
                 BatteryState::Charging => {
@@ -166,9 +166,9 @@ impl Widget for BatteryWidget {
         }
 
         // Colors and config must be resolved before any drawing so themed overrides apply everywhere.
-        let fg_color = Some(state.config_ink.resolve_color("fg"));
-        let bg_color = Some(state.config_ink.resolve_bg("bg"));
-        let accent_color = Some(state.config_ink.resolve_color("accent"));
+        let fg_color = Some(state.config.resolve_color("fg"));
+        let bg_color = Some(state.config.resolve_bg("bg"));
+        let accent_color = Some(state.config.resolve_color("accent"));
 
         let base_config = state
             .config
@@ -197,16 +197,16 @@ impl Widget for BatteryWidget {
 
         let success_color = resolve_override(
             "color_high",
-            Some(state.config_ink.resolve_color("success")),
+            Some(state.config.resolve_color("success")),
         );
 
         let warning_color = resolve_override(
             "color_medium",
-            Some(state.config_ink.resolve_color("secondary")),
+            Some(state.config.resolve_color("secondary")),
         );
 
         let error_color =
-            resolve_override("color_low", Some(state.config_ink.resolve_color("error")));
+            resolve_override("color_low", Some(state.config.resolve_color("error")));
 
         let bar_color = if self.charging {
             success_color.or(fg_color)
@@ -322,9 +322,9 @@ impl Widget for BatteryWidget {
                     let c = ColorResolver::hex_to_color(hex);
                     Color::Rgb(c.r, c.g, c.b)
                 } else {
-                    state.config_ink.resolve_color("accent")
+                    state.config.resolve_color("accent")
                 };
-                let low_color = state.config_ink.resolve_color("error");
+                let low_color = state.config.resolve_color("error");
 
                 *effect_lock = match current_state {
                     BatteryState::Charging => Some(

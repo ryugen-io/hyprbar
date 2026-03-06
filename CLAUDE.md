@@ -30,7 +30,7 @@ just version        # Show version
 
 ## Architecture
 
-**hyprbar** is a Wayland status bar built with ratatui for TUI rendering and smithay-client-toolkit for Wayland layer shell integration.
+**hyprsbar** is a Wayland status bar built with ratatui for TUI rendering and smithay-client-toolkit for Wayland layer shell integration.
 
 ### Project Structure
 
@@ -38,7 +38,7 @@ Single crate with modules:
 - `src/renderer/` - Rendering logic (split into mod.rs, input.rs, layout.rs, popup.rs, types.rs, widgets.rs)
 - `src/wayland/` - Wayland integration via SCTK - layer shell, event handling, text rendering with fontdue
 - `src/modules/` - Bootstrap, runner, config, logging, wayland_integration
-- `src/bin/hyprbar.rs` - Binary entry point with CLI (clap)
+- `src/bin/hyprsbar.rs` - Binary entry point with CLI (clap)
 
 ### Widget System
 
@@ -57,13 +57,13 @@ pub trait Widget: Send + Sync {
 }
 ```
 
-Widgets are loaded as dynamic plugins (.so) from `~/.local/share/hyprbar/widgets/`.
+Widgets are loaded as dynamic plugins (.so) from `~/.local/share/hyprsbar/widgets/`.
 
 ### Configuration
 
-- **Config file**: `~/.config/hypr/hyprbar.conf` (TOML)
-- **Theme/Colors**: Via `hyprink` library
-- **Logging**: Via `hyprlog` library
+- **Config file**: `~/.config/hypr/hyprsbar.conf` (TOML)
+- **Theme/Colors**: Via `BarConfig` (`style.*` / `style.colors`) from `hyprsbar.conf`
+- **Logging**: Via `hyprslog` library
 
 Config struct hierarchy: `BarConfig` -> `WindowConfig`, `StyleConfig`, `LayoutConfig`, `PopupConfig`
 
@@ -75,16 +75,16 @@ Config struct hierarchy: `BarConfig` -> `WindowConfig`, `StyleConfig`, `LayoutCo
 
 ### Key Dependencies
 
-- `hyprink`: Theme/color configuration
-- `hyprlog`: Logging utilities
+- `hyprs-conf`: Metadata-based config discovery (`type = bar`)
+- `hyprslog`: Logging utilities
 - `ratatui`: TUI buffer/widget rendering
 - `tachyonfx`: Visual effects (fade, etc.)
 - `smithay-client-toolkit`: Wayland protocols
-- `fontdue`: Font rasterization
+- `cosmic-text`: Font shaping and rasterization
 
 ## Debug Mode
 
-Run with `--debug` to spawn a separate terminal tailing logs via Unix socket (`hyprbar-debug.sock`).
+Run with `--debug` to spawn a separate terminal tailing logs via Unix socket (`hyprsbar-debug.sock`).
 
 ## Code Style
 

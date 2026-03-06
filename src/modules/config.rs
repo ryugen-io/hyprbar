@@ -1,7 +1,7 @@
 use crate::config::BarConfig;
 use crate::modules::logging::{log_error, log_warn};
 use anyhow::{Context, Result};
-use hypr_conf::{ConfigMetaSpec, load_toml_with_includes, resolve_config_path_strict};
+use hyprs_conf::{ConfigMetaSpec, load_toml_with_includes, resolve_config_path_strict};
 use std::env;
 use std::path::{Path, PathBuf};
 use toml::Value;
@@ -37,7 +37,7 @@ pub fn load_bar_config() -> BarConfig {
 }
 
 fn resolve_bar_config_path(config_dir: &Path) -> Option<PathBuf> {
-    let default_path = config_dir.join("hyprbar.conf");
+    let default_path = config_dir.join("hyprs/bar.conf");
     let spec = ConfigMetaSpec::for_type(TYPE_VALUE, CONFIG_EXTENSIONS);
     resolve_config_path_strict(config_dir, &default_path, &spec)
 }
@@ -50,11 +50,11 @@ fn load_recursive_config(path: &Path, home_dir: &Path) -> Result<Value> {
 pub fn get_socket_path() -> PathBuf {
     let runtime_dir = dirs::runtime_dir().unwrap_or_else(env::temp_dir);
 
-    runtime_dir.join("hyprbar-debug.sock")
+    runtime_dir.join("hyprsbar-debug.sock")
 }
 
 pub fn get_pid_file_path() -> PathBuf {
     let runtime_dir = dirs::runtime_dir().unwrap_or_else(env::temp_dir);
 
-    runtime_dir.join("hyprbar.pid")
+    runtime_dir.join("hyprsbar.pid")
 }

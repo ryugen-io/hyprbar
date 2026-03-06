@@ -34,12 +34,12 @@ impl App {
             MenuItem {
                 label: "Toggle Hyprbar".to_string(),
                 action: MenuAction::ToggleService,
-                description: "Start or Stop the hyprbar bar".to_string(),
+                description: "Start or Stop the hyprsbar bar".to_string(),
             },
             MenuItem {
                 label: "Edit Config".to_string(),
                 action: MenuAction::EditConfig,
-                description: "Open hyprbar.toml in editor".to_string(),
+                description: "Open hyprsbar.toml in editor".to_string(),
             },
             MenuItem {
                 label: "Quit".to_string(),
@@ -102,7 +102,7 @@ impl App {
                 return false;
             }
 
-            (name == "hyprbar" || name == "ks-bin")
+            (name == "hyprsbar" || name == "ks-bin")
                 && p.pid().as_u32() != my_pid
                 && !p
                     .cmd()
@@ -146,8 +146,8 @@ impl App {
                 let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
                 let config_path = std::path::PathBuf::from(home)
                     .join(".config")
-                    .join("hyprbar")
-                    .join("hyprbar.toml");
+                    .join("hyprsbar")
+                    .join("hyprsbar.toml");
 
                 // $TERMINAL is preferred; fall back to probing common emulators.
                 let terminal = std::env::var("TERMINAL").ok().or_else(|| {

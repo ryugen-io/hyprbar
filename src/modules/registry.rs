@@ -102,6 +102,6 @@ impl Registry {
 
 fn get_registry_path() -> PathBuf {
     dirs::data_local_dir()
-        .map(|p| p.join("hyprbar/dishes/registry.bin"))
+        .map(|p| p.join("hyprs/bar/dishes/registry.bin"))
         .unwrap_or_else(|| PathBuf::from("registry.bin")) // Fallback (shouldn't happen on Linux)
 }

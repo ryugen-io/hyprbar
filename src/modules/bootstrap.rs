@@ -1,5 +1,4 @@
 use anyhow::Result;
-use hyprink::config::Config;
 use std::sync::Arc;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::time::Duration;
@@ -10,21 +9,14 @@ use crate::{config::BarConfig, renderer::BarRenderer, state::BarState};
 use crate::plugin_loader::PluginManager;
 
 pub async fn init_application(
-    config_ink: Arc<Config>,
     config: BarConfig,
-) -> Result<(Arc<Config>, BarConfig, BarState, PluginManager, BarRenderer)> {
+) -> Result<(Arc<BarConfig>, BarState, PluginManager, BarRenderer)> {
     log_debug("BOOTSTRAP", "Starting application initialization");
+    let config = Arc::new(config);
 
     // Config labels are fetched now because the Arc is shared and the signal task
-    // needs owned Strings — can't borrow from config_ink across the spawn boundary.
-    let get_msg = |key: &str, default: &str| -> String {
-        config_ink
-            .layout
-            .labels
-            .get(key)
-            .cloned()
-            .unwrap_or_else(|| default.to_string())
-    };
+    // needs owned Strings — can't borrow from config across the spawn boundary.
+    let get_msg = |key: &str, default: &str| -> String { config.label(key, default).to_string() };
 
     let msg_sigterm = get_msg("bar_sigterm", "Received SIGTERM (Toggle), shutting down...");
     let msg_sigint = get_msg("bar_sigint", "Received SIGINT, shutting down...");
@@ -32,7 +24,7 @@ pub async fn init_application(
     log_debug("BOOTSTRAP", "Signal handlers configured");
 
     // Brief delay before exit gives in-flight Wayland frames time to finish rendering.
-    let _signal_config_ink = config_ink.clone();
+    let _signal_config = config.clone();
     tokio::spawn(async move {
         let mut term = signal(SignalKind::terminate()).unwrap();
         let mut int = signal(SignalKind::interrupt()).unwrap();
@@ -47,14 +39,14 @@ pub async fn init_application(
     });
 
     log_debug("BOOTSTRAP", "Initializing bar state");
-    let bar_state = BarState::new(config_ink.clone(), config.clone());
+    let bar_state = BarState::new(config.clone());
 
     log_debug("PLUGINS", "Initializing plugin manager");
     let mut plugin_manager = PluginManager::new();
 
     // XDG data dir is the canonical location for user-installed widget .so files.
     if let Some(data_dir) = dirs::data_local_dir() {
-        let widgets_dir = data_dir.join("hyprbar/widgets");
+        let widgets_dir = data_dir.join("hyprs/bar/widgets");
         log_debug(
             "PLUGINS",
             &format!("Scanning for plugins in {:?}", widgets_dir),
@@ -91,11 +83,10 @@ pub async fn init_application(
     let renderer = BarRenderer::new(
         100, // Placeholder — real width arrives in the first Wayland configure event.
         config.window.height as u16,
-        &config,
-        &bar_state.config_ink,
+        config.as_ref(),
         &plugin_manager,
     );
 
     log_info("BOOTSTRAP", "Application initialization complete");
-    Ok((config_ink, config, bar_state, plugin_manager, renderer))
+    Ok((config, bar_state, plugin_manager, renderer))
 }

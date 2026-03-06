@@ -1,4 +1,4 @@
-use hyprbar::prelude::*;
+use hyprsbar::prelude::*;
 
 pub struct TextArea {
     instance_name: Option<String>,
@@ -33,7 +33,7 @@ impl Widget for TextArea {
 
         Label::new(&content)
             .variant(TypographyVariant::Body)
-            .render(area, buf, state.config_ink.as_ref());
+            .render(area, buf, state.config.as_ref());
     }
 }
 
@@ -60,7 +60,7 @@ impl TextArea {
         base_config
             .and_then(|t| t.get("content"))
             .and_then(|v| v.as_str())
-            .unwrap_or("hyprbar")
+            .unwrap_or("hyprsbar")
             .to_string()
     }
 }
